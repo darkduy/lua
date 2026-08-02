@@ -173,6 +173,7 @@ local function setVerticalButtonState(button, isHeld)
 	button.BackgroundColor3 = isHeld and ACTIVE_BUTTON_COLOR or INACTIVE_BUTTON_COLOR
 end
 
+
 local function bindHoldButton(button, setHeld)
 	button.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -277,6 +278,7 @@ renderConnection = RunService.RenderStepped:Connect(function()
 	if not char then return end
 	local humanoid = char:FindFirstChild("Humanoid")
 	if not humanoid then return end
+
 
 	local dir = controlModule:GetMoveVector()
 
@@ -413,4 +415,4 @@ screenGui.Destroying:Connect(function()
 	end
 end)
 
-print("Fly & Noclip (Merged) loaded! Press F or use the GUI button.")
+print("Fly & Noclip loaded! Press F or use the GUI button. Camera Lock is now in camera lock.lua.")
