@@ -20,6 +20,7 @@ local ACTIVE_BUTTON_COLOR = Color3.fromRGB(0, 200, 255)
 local INACTIVE_BUTTON_COLOR = Color3.fromRGB(0, 120, 255)
 
 local originalWalkSpeed = DEFAULT_WALK_SPEED
+local originalSeatedStateEnabled = true
 local originalCanCollide = {}
 
 local playerScripts = player:WaitForChild("PlayerScripts")
@@ -173,6 +174,34 @@ local function setVerticalButtonState(button, isHeld)
 	button.BackgroundColor3 = isHeld and ACTIVE_BUTTON_COLOR or INACTIVE_BUTTON_COLOR
 end
 
+local function setFlyingSeatLock(humanoid, isLocked)
+	if isLocked then
+		originalSeatedStateEnabled = humanoid:GetStateEnabled(Enum.HumanoidStateType.Seated)
+		humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+		humanoid.Sit = false
+		humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+	else
+		humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, originalSeatedStateEnabled)
+		humanoid.Sit = false
+	end
+end
+
+local function forceUnseatWhileFlying(humanoid)
+	if humanoid.Sit or humanoid.SeatPart then
+		humanoid.Sit = false
+		humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+	end
+end
+
+local function getYawOnlyCameraCFrame(position)
+	local lookVector = camera.CFrame.LookVector
+	local flatLookVector = Vector3.new(lookVector.X, 0, lookVector.Z)
+	if flatLookVector.Magnitude <= 0 then
+		return CFrame.new(position)
+	end
+	return CFrame.lookAt(position, position + flatLookVector.Unit)
+end
+
 local function bindHoldButton(button, setHeld)
 	button.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -223,6 +252,7 @@ local function startFlyNoclip()
 	humanoidCache = humanoid
 	originalWalkSpeed = humanoid.WalkSpeed
 
+	setFlyingSeatLock(humanoid, true)
 	humanoid.AutoRotate = false
 	humanoid.PlatformStand = false
 	humanoid.WalkSpeed = speed
@@ -257,6 +287,7 @@ local function stopFlyNoclip()
 	end
 
 	if humanoidCache then
+		setFlyingSeatLock(humanoidCache, false)
 		humanoidCache.AutoRotate = true
 		humanoidCache.PlatformStand = false
 		humanoidCache.WalkSpeed = originalWalkSpeed
@@ -278,6 +309,8 @@ renderConnection = RunService.RenderStepped:Connect(function()
 	local humanoid = char:FindFirstChild("Humanoid")
 	if not humanoid then return end
 
+	forceUnseatWhileFlying(humanoid)
+
 	local dir = controlModule:GetMoveVector()
 
 	local moveVector = Vector3.new(0, 0, 0)
@@ -296,7 +329,7 @@ renderConnection = RunService.RenderStepped:Connect(function()
 	end
 
 	bodyVelocity.Velocity = moveVector
-	bodyGyro.CFrame = camera.CFrame
+	bodyGyro.CFrame = getYawOnlyCameraCFrame(root.Position)
 
 	local horizontalDir = moveVector * Vector3.new(1, 0, 1)
 	if horizontalDir.Magnitude > 0 then
