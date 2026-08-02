@@ -227,6 +227,7 @@ local function startFlyNoclip()
 	humanoidCache = humanoid
 	originalWalkSpeed = humanoid.WalkSpeed
 
+	setFlyingSeatLock(humanoid, true)
 	humanoid.AutoRotate = false
 	humanoid.PlatformStand = false
 	humanoid.WalkSpeed = speed
@@ -261,6 +262,7 @@ local function stopFlyNoclip()
 	end
 
 	if humanoidCache then
+		setFlyingSeatLock(humanoidCache, false)
 		humanoidCache.AutoRotate = true
 		humanoidCache.PlatformStand = false
 		humanoidCache.WalkSpeed = originalWalkSpeed
@@ -305,7 +307,7 @@ renderConnection = RunService.RenderStepped:Connect(function()
 	end
 
 	bodyVelocity.Velocity = moveVector
-	bodyGyro.CFrame = camera.CFrame
+	bodyGyro.CFrame = getYawOnlyCameraCFrame(root.Position)
 
 	local horizontalDir = moveVector * Vector3.new(1, 0, 1)
 	if horizontalDir.Magnitude > 0 then
