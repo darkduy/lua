@@ -306,9 +306,8 @@ renderConnection = RunService.RenderStepped:Connect(function()
 
 	local char = player.Character
 	if not char then return end
-	local root = char:FindFirstChild("HumanoidRootPart")
 	local humanoid = char:FindFirstChild("Humanoid")
-	if not root or not humanoid then return end
+	if not humanoid then return end
 
 	forceUnseatWhileFlying(humanoid)
 
