@@ -20,7 +20,6 @@ local ACTIVE_BUTTON_COLOR = Color3.fromRGB(0, 200, 255)
 local INACTIVE_BUTTON_COLOR = Color3.fromRGB(0, 120, 255)
 
 local originalWalkSpeed = DEFAULT_WALK_SPEED
-local originalSeatedStateEnabled = true
 local originalCanCollide = {}
 
 local playerScripts = player:WaitForChild("PlayerScripts")
@@ -174,32 +173,8 @@ local function setVerticalButtonState(button, isHeld)
 	button.BackgroundColor3 = isHeld and ACTIVE_BUTTON_COLOR or INACTIVE_BUTTON_COLOR
 end
 
-local function setFlyingSeatLock(humanoid, isLocked)
-	if isLocked then
-		originalSeatedStateEnabled = humanoid:GetStateEnabled(Enum.HumanoidStateType.Seated)
-		humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
-		humanoid.Sit = false
-		humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
-	else
-		humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, originalSeatedStateEnabled)
-		humanoid.Sit = false
-	end
-end
-
-local function forceUnseatWhileFlying(humanoid)
-	if humanoid.Sit or humanoid.SeatPart then
-		humanoid.Sit = false
-		humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
-	end
-end
-
-local function getYawOnlyCameraCFrame(position)
-	local lookVector = camera.CFrame.LookVector
-	local flatLookVector = Vector3.new(lookVector.X, 0, lookVector.Z)
-	if flatLookVector.Magnitude <= 0 then
-		return CFrame.new(position)
-	end
-	return CFrame.lookAt(position, position + flatLookVector.Unit)
+local function shouldStopFlyForSeat(humanoid)
+	return humanoid.Sit or humanoid.SeatPart ~= nil
 end
 
 local function bindHoldButton(button, setHeld)
@@ -309,7 +284,10 @@ renderConnection = RunService.RenderStepped:Connect(function()
 	local humanoid = char:FindFirstChild("Humanoid")
 	if not humanoid then return end
 
-	forceUnseatWhileFlying(humanoid)
+	if shouldStopFlyForSeat(humanoid) then
+		stopFlyNoclip()
+		return
+	end
 
 	local dir = controlModule:GetMoveVector()
 
