@@ -173,10 +173,6 @@ local function setVerticalButtonState(button, isHeld)
 	button.BackgroundColor3 = isHeld and ACTIVE_BUTTON_COLOR or INACTIVE_BUTTON_COLOR
 end
 
-local function shouldStopFlyForSeat(humanoid)
-	return humanoid.Sit or humanoid.SeatPart ~= nil
-end
-
 local function bindHoldButton(button, setHeld)
 	button.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -227,7 +223,6 @@ local function startFlyNoclip()
 	humanoidCache = humanoid
 	originalWalkSpeed = humanoid.WalkSpeed
 
-	setFlyingSeatLock(humanoid, true)
 	humanoid.AutoRotate = false
 	humanoid.PlatformStand = false
 	humanoid.WalkSpeed = speed
@@ -262,7 +257,6 @@ local function stopFlyNoclip()
 	end
 
 	if humanoidCache then
-		setFlyingSeatLock(humanoidCache, false)
 		humanoidCache.AutoRotate = true
 		humanoidCache.PlatformStand = false
 		humanoidCache.WalkSpeed = originalWalkSpeed
@@ -284,11 +278,6 @@ renderConnection = RunService.RenderStepped:Connect(function()
 	local humanoid = char:FindFirstChild("Humanoid")
 	if not humanoid then return end
 
-	if shouldStopFlyForSeat(humanoid) then
-		stopFlyNoclip()
-		return
-	end
-
 	local dir = controlModule:GetMoveVector()
 
 	local moveVector = Vector3.new(0, 0, 0)
@@ -307,7 +296,7 @@ renderConnection = RunService.RenderStepped:Connect(function()
 	end
 
 	bodyVelocity.Velocity = moveVector
-	bodyGyro.CFrame = getYawOnlyCameraCFrame(root.Position)
+	bodyGyro.CFrame = camera.CFrame
 
 	local horizontalDir = moveVector * Vector3.new(1, 0, 1)
 	if horizontalDir.Magnitude > 0 then
