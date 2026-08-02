@@ -10,7 +10,22 @@ local speed = 60
 
 local bodyVelocity, bodyGyro
 local noclipConnection = nil
-local originalWalkSpeed = 16
+local renderConnection = nil
+local characterConnection = nil
+
+local MIN_SPEED = 30
+local MAX_SPEED = 200
+local DEFAULT_WALK_SPEED = 16
+local ACTIVE_BUTTON_COLOR = Color3.fromRGB(0, 200, 255)
+local INACTIVE_BUTTON_COLOR = Color3.fromRGB(0, 120, 255)
+
+local originalWalkSpeed = DEFAULT_WALK_SPEED
+local originalSeatedStateEnabled = true
+local originalCanCollide = {}
+
+local playerScripts = player:WaitForChild("PlayerScripts")
+local playerModule = playerScripts:WaitForChild("PlayerModule")
+local controlModule = require(playerModule:WaitForChild("ControlModule"))
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "FlyNoclipGUI"
@@ -98,7 +113,7 @@ speedSlider.Parent = contentFrame
 Instance.new("UICorner", speedSlider)
 
 local sliderFill = Instance.new("Frame")
-sliderFill.Size = UDim2.new(speed/200, 0, 1, 0)
+sliderFill.Size = UDim2.new((speed - MIN_SPEED) / (MAX_SPEED - MIN_SPEED), 0, 1, 0)
 sliderFill.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
 sliderFill.BorderSizePixel = 0
 sliderFill.Parent = speedSlider
@@ -107,7 +122,7 @@ Instance.new("UICorner", sliderFill)
 local upButton = Instance.new("TextButton")
 upButton.Size = UDim2.new(0.4, 0, 0, 40)
 upButton.Position = UDim2.new(0.05, 0, 0, 128)
-upButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+upButton.BackgroundColor3 = INACTIVE_BUTTON_COLOR
 upButton.Text = "↑ UP"
 upButton.TextColor3 = Color3.new(1,1,1)
 upButton.TextScaled = true
@@ -117,7 +132,7 @@ Instance.new("UICorner", upButton).CornerRadius = UDim.new(0, 8)
 local downButton = Instance.new("TextButton")
 downButton.Size = UDim2.new(0.4, 0, 0, 40)
 downButton.Position = UDim2.new(0.55, 0, 0, 128)
-downButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+downButton.BackgroundColor3 = INACTIVE_BUTTON_COLOR
 downButton.Text = "↓ DOWN"
 downButton.TextColor3 = Color3.new(1,1,1)
 downButton.TextScaled = true
@@ -137,14 +152,82 @@ reopenButton.Parent = screenGui
 Instance.new("UICorner", reopenButton).CornerRadius = UDim.new(0, 22)
 
 local humanoidCache = nil
+local upHeld = false
+local downHeld = false
+
+local function rememberCollisionState(part)
+	if originalCanCollide[part] == nil then
+		originalCanCollide[part] = part.CanCollide
+	end
+end
+
+local function restoreCollisionState(character)
+	for part, canCollide in pairs(originalCanCollide) do
+		if part and part.Parent and (not character or part:IsDescendantOf(character)) then
+			part.CanCollide = canCollide
+		end
+		originalCanCollide[part] = nil
+	end
+end
+
+local function setVerticalButtonState(button, isHeld)
+	button.BackgroundColor3 = isHeld and ACTIVE_BUTTON_COLOR or INACTIVE_BUTTON_COLOR
+end
+
+local function setFlyingSeatLock(humanoid, isLocked)
+	if isLocked then
+		originalSeatedStateEnabled = humanoid:GetStateEnabled(Enum.HumanoidStateType.Seated)
+		humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+		humanoid.Sit = false
+		humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+	else
+		humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, originalSeatedStateEnabled)
+		humanoid.Sit = false
+	end
+end
+
+local function forceUnseatWhileFlying(humanoid)
+	if humanoid.Sit or humanoid.SeatPart then
+		humanoid.Sit = false
+		humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+	end
+end
+
+local function getYawOnlyCameraCFrame(position)
+	local lookVector = camera.CFrame.LookVector
+	local flatLookVector = Vector3.new(lookVector.X, 0, lookVector.Z)
+	if flatLookVector.Magnitude <= 0 then
+		return CFrame.new(position)
+	end
+	return CFrame.lookAt(position, position + flatLookVector.Unit)
+end
+
+local function bindHoldButton(button, setHeld)
+	button.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			setHeld(true)
+		end
+	end)
+
+	button.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			setHeld(false)
+		end
+	end)
+
+	button.MouseLeave:Connect(function()
+		setHeld(false)
+	end)
+end
 
 local function startNoclipLoop()
 	if noclipConnection then return end
 	noclipConnection = RunService.Stepped:Connect(function()
 		local char = player.Character
 		if not char then return end
-		for _, part in pairs(char:GetDescendants()) do
+		for _, part in ipairs(char:GetDescendants()) do
 			if part:IsA("BasePart") then
+				rememberCollisionState(part)
 				part.CanCollide = false
 			end
 		end
@@ -155,14 +238,7 @@ local function stopNoclipLoop()
 	if noclipConnection then
 		noclipConnection:Disconnect()
 		noclipConnection = nil
-		local char = player.Character
-		if char then
-			for _, part in pairs(char:GetDescendants()) do
-				if part:IsA("BasePart") then
-					part.CanCollide = true
-				end
-			end
-		end
+		restoreCollisionState(player.Character)
 	end
 end
 
@@ -176,6 +252,7 @@ local function startFlyNoclip()
 	humanoidCache = humanoid
 	originalWalkSpeed = humanoid.WalkSpeed
 
+	setFlyingSeatLock(humanoid, true)
 	humanoid.AutoRotate = false
 	humanoid.PlatformStand = false
 	humanoid.WalkSpeed = speed
@@ -200,10 +277,17 @@ local function stopFlyNoclip()
 	if not flying then return end
 	flying = false
 
-	if bodyVelocity then bodyVelocity:Destroy() end
-	if bodyGyro then bodyGyro:Destroy() end
+	if bodyVelocity then
+		bodyVelocity:Destroy()
+		bodyVelocity = nil
+	end
+	if bodyGyro then
+		bodyGyro:Destroy()
+		bodyGyro = nil
+	end
 
 	if humanoidCache then
+		setFlyingSeatLock(humanoidCache, false)
 		humanoidCache.AutoRotate = true
 		humanoidCache.PlatformStand = false
 		humanoidCache.WalkSpeed = originalWalkSpeed
@@ -217,7 +301,7 @@ local function stopFlyNoclip()
 	flyNoclipButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
 end
 
-RunService.RenderStepped:Connect(function()
+renderConnection = RunService.RenderStepped:Connect(function()
 	if not flying or not bodyVelocity or not bodyGyro then return end
 
 	local char = player.Character
@@ -226,20 +310,19 @@ RunService.RenderStepped:Connect(function()
 	local humanoid = char:FindFirstChild("Humanoid")
 	if not root or not humanoid then return end
 
-	local ControlModule = require(player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule"):WaitForChild("ControlModule"))
-	local dir = ControlModule:GetMoveVector()
+	forceUnseatWhileFlying(humanoid)
+
+	local dir = controlModule:GetMoveVector()
 
 	local moveVector = Vector3.new(0, 0, 0)
 	moveVector += camera.CFrame.LookVector * (-dir.Z)
 	moveVector += camera.CFrame.RightVector * dir.X
 
-	if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
-		if upButton.BackgroundColor3 == Color3.fromRGB(0, 200, 255) then
-			moveVector += Vector3.new(0, 1, 0)
-		end
-		if downButton.BackgroundColor3 == Color3.fromRGB(0, 200, 255) then
-			moveVector -= Vector3.new(0, 1, 0)
-		end
+	if upHeld then
+		moveVector += Vector3.new(0, 1, 0)
+	end
+	if downHeld then
+		moveVector -= Vector3.new(0, 1, 0)
 	end
 
 	if moveVector.Magnitude > 0 then
@@ -247,7 +330,7 @@ RunService.RenderStepped:Connect(function()
 	end
 
 	bodyVelocity.Velocity = moveVector
-	bodyGyro.CFrame = camera.CFrame
+	bodyGyro.CFrame = getYawOnlyCameraCFrame(root.Position)
 
 	local horizontalDir = moveVector * Vector3.new(1, 0, 1)
 	if horizontalDir.Magnitude > 0 then
@@ -257,29 +340,36 @@ RunService.RenderStepped:Connect(function()
 	end
 end)
 
-flyNoclipButton.MouseButton1Click:Connect(function()
+local function toggleFlyNoclip()
 	if flying then
 		stopFlyNoclip()
 	else
 		startFlyNoclip()
 	end
-end)
+end
+
+flyNoclipButton.MouseButton1Click:Connect(toggleFlyNoclip)
+
+local function updateSpeedFromScreenX(screenX)
+	local sliderPos = speedSlider.AbsolutePosition.X
+	local sliderWidth = speedSlider.AbsoluteSize.X
+	if sliderWidth <= 0 then return end
+	local percent = math.clamp((screenX - sliderPos) / sliderWidth, 0, 1)
+	speed = math.floor(MIN_SPEED + percent * (MAX_SPEED - MIN_SPEED))
+	sliderFill.Size = UDim2.new(percent, 0, 1, 0)
+	speedLabel.Text = "Speed: " .. speed
+	if flying and humanoidCache then
+		humanoidCache.WalkSpeed = speed
+	end
+end
 
 speedSlider.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		updateSpeedFromScreenX(input.Position.X)
 		local moveConn
 		moveConn = UserInputService.InputChanged:Connect(function(moveInput)
 			if moveInput.UserInputType == Enum.UserInputType.MouseMovement or moveInput.UserInputType == Enum.UserInputType.Touch then
-				local mousePos = UserInputService:GetMouseLocation().X
-				local sliderPos = speedSlider.AbsolutePosition.X
-				local sliderWidth = speedSlider.AbsoluteSize.X
-				local percent = math.clamp((mousePos - sliderPos) / sliderWidth, 0, 1)
-				speed = math.floor(30 + percent * 170)
-				sliderFill.Size = UDim2.new(percent, 0, 1, 0)
-				speedLabel.Text = "Speed: " .. speed
-				if flying and humanoidCache then
-					humanoidCache.WalkSpeed = speed
-				end
+				updateSpeedFromScreenX(moveInput.Position.X)
 			end
 		end)
 		local endConn
@@ -292,13 +382,15 @@ speedSlider.InputBegan:Connect(function(input)
 	end
 end)
 
-upButton.MouseButton1Down:Connect(function() upButton.BackgroundColor3 = Color3.fromRGB(0, 200, 255) end)
-upButton.MouseButton1Up:Connect(function() upButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255) end)
-upButton.MouseLeave:Connect(function() upButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255) end)
+bindHoldButton(upButton, function(isHeld)
+	upHeld = isHeld
+	setVerticalButtonState(upButton, isHeld)
+end)
 
-downButton.MouseButton1Down:Connect(function() downButton.BackgroundColor3 = Color3.fromRGB(0, 200, 255) end)
-downButton.MouseButton1Up:Connect(function() downButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255) end)
-downButton.MouseLeave:Connect(function() downButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255) end)
+bindHoldButton(downButton, function(isHeld)
+	downHeld = isHeld
+	setVerticalButtonState(downButton, isHeld)
+end)
 
 local isMinimized = false
 minimizeButton.MouseButton1Click:Connect(function()
@@ -333,7 +425,25 @@ end)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end
 	if input.KeyCode == Enum.KeyCode.F then
-		flyNoclipButton.MouseButton1Click:Fire()
+		toggleFlyNoclip()
+	end
+end)
+
+characterConnection = player.CharacterAdded:Connect(function()
+	if flying then
+		stopFlyNoclip()
+	end
+end)
+
+screenGui.Destroying:Connect(function()
+	stopFlyNoclip()
+	if renderConnection then
+		renderConnection:Disconnect()
+		renderConnection = nil
+	end
+	if characterConnection then
+		characterConnection:Disconnect()
+		characterConnection = nil
 	end
 end)
 
