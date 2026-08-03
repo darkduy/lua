@@ -21,6 +21,7 @@ local PROTECTED_STATES = {
 local godEnabled = false
 local activeCharacter = nil
 local originalStatsByHumanoid = {}
+local fallHealthByHumanoid = {}
 local connections = {}
 
 local function trackConnection(connection)
@@ -53,6 +54,8 @@ local function rememberOriginalStats(humanoid)
         return
     end
 
+    fallHealthByHumanoid[humanoid] = nil
+
     originalStatsByHumanoid[humanoid] = {
         MaxHealth = humanoid.MaxHealth,
         Health = humanoid.Health,
@@ -80,13 +83,12 @@ local function restoreHumanoid(humanoid)
         end
 
         originalStatsByHumanoid[humanoid] = nil
+        fallHealthByHumanoid[humanoid] = nil
     else
         humanoid.BreakJointsOnDeath = true
         humanoid.MaxHealth = DEFAULT_MAX_HEALTH
         humanoid.Health = DEFAULT_HEALTH
     end
-
-    return character:FindFirstChildOfClass("Humanoid") or character:WaitForChild("Humanoid", 10)
 end
 
 local function protectHumanoid(humanoid)
@@ -118,6 +120,19 @@ local function protectHumanoid(humanoid)
 
     trackConnection(humanoid.StateChanged:Connect(function(_, newState)
         if not godEnabled then
+            return
+        end
+
+        if newState == Enum.HumanoidStateType.Freefall then
+            fallHealthByHumanoid[humanoid] = math.max(humanoid.Health, GOD_HEALTH)
+            humanoid.Health = GOD_HEALTH
+            return
+        end
+
+        if newState == Enum.HumanoidStateType.Landed then
+            local fallHealth = fallHealthByHumanoid[humanoid] or GOD_HEALTH
+            humanoid.Health = math.max(humanoid.Health, fallHealth, GOD_HEALTH)
+            fallHealthByHumanoid[humanoid] = nil
             return
         end
 
