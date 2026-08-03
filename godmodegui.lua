@@ -8,9 +8,15 @@ local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
-local GOD_HEALTH = 1_000_000_000
+local GOD_HEALTH = 1000000000
 local DEFAULT_MAX_HEALTH = 100
 local DEFAULT_HEALTH = 100
+
+local PROTECTED_STATES = {
+    Enum.HumanoidStateType.Dead,
+    Enum.HumanoidStateType.FallingDown,
+    Enum.HumanoidStateType.Ragdoll,
+}
 
 local godEnabled = false
 local activeCharacter = nil
@@ -29,7 +35,9 @@ local function disconnectAll()
         end
     end
 
-    table.clear(connections)
+    for index = #connections, 1, -1 do
+        connections[index] = nil
+    end
 end
 
 local function getHumanoid(character)
@@ -49,7 +57,12 @@ local function rememberOriginalStats(humanoid)
         MaxHealth = humanoid.MaxHealth,
         Health = humanoid.Health,
         BreakJointsOnDeath = humanoid.BreakJointsOnDeath,
+        StateEnabled = {},
     }
+
+    for _, state in ipairs(PROTECTED_STATES) do
+        originalStatsByHumanoid[humanoid].StateEnabled[state] = humanoid:GetStateEnabled(state)
+    end
 end
 
 local function restoreHumanoid(humanoid)
@@ -62,12 +75,18 @@ local function restoreHumanoid(humanoid)
         humanoid.BreakJointsOnDeath = originalStats.BreakJointsOnDeath
         humanoid.MaxHealth = originalStats.MaxHealth
         humanoid.Health = math.clamp(originalStats.Health, 0, originalStats.MaxHealth)
+        for state, wasEnabled in pairs(originalStats.StateEnabled) do
+            humanoid:SetStateEnabled(state, wasEnabled)
+        end
+
         originalStatsByHumanoid[humanoid] = nil
     else
         humanoid.BreakJointsOnDeath = true
         humanoid.MaxHealth = DEFAULT_MAX_HEALTH
         humanoid.Health = DEFAULT_HEALTH
     end
+
+    return character:FindFirstChildOfClass("Humanoid") or character:WaitForChild("Humanoid", 10)
 end
 
 local function protectHumanoid(humanoid)
@@ -77,6 +96,11 @@ local function protectHumanoid(humanoid)
 
     rememberOriginalStats(humanoid)
     humanoid.BreakJointsOnDeath = false
+
+    for _, state in ipairs(PROTECTED_STATES) do
+        humanoid:SetStateEnabled(state, false)
+    end
+
     humanoid.MaxHealth = GOD_HEALTH
     humanoid.Health = GOD_HEALTH
 
@@ -89,6 +113,24 @@ local function protectHumanoid(humanoid)
     trackConnection(humanoid:GetPropertyChangedSignal("MaxHealth"):Connect(function()
         if godEnabled and humanoid.MaxHealth < GOD_HEALTH then
             humanoid.MaxHealth = GOD_HEALTH
+        end
+    end))
+
+    trackConnection(humanoid.StateChanged:Connect(function(_, newState)
+        if not godEnabled then
+            return
+        end
+
+        if newState == Enum.HumanoidStateType.Dead or newState == Enum.HumanoidStateType.FallingDown or newState == Enum.HumanoidStateType.Ragdoll then
+            humanoid.Health = GOD_HEALTH
+            humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+        end
+    end))
+
+    trackConnection(humanoid.Died:Connect(function()
+        if godEnabled then
+            humanoid.Health = GOD_HEALTH
+            humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
         end
     end))
 end
@@ -111,6 +153,10 @@ local function disableGodMode()
 end
 
 local function createCorner(parent, radius)
+    if not Instance.new then
+        return nil
+    end
+
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, radius)
     corner.Parent = parent
@@ -155,7 +201,8 @@ local function makeDraggable(frame, dragHandle)
     end)
 end
 
-local existingGui = player:WaitForChild("PlayerGui"):FindFirstChild("GodModeGUI")
+local playerGui = player:WaitForChild("PlayerGui")
+local existingGui = playerGui:FindFirstChild("GodModeGUI")
 if existingGui then
     existingGui:Destroy()
 end
@@ -164,7 +211,7 @@ local gui = Instance.new("ScreenGui")
 gui.Name = "GodModeGUI"
 gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-gui.Parent = player:WaitForChild("PlayerGui")
+gui.Parent = playerGui
 
 local frame = Instance.new("Frame")
 frame.Name = "MainFrame"
