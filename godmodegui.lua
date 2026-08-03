@@ -85,6 +85,8 @@ local function restoreHumanoid(humanoid)
         humanoid.MaxHealth = DEFAULT_MAX_HEALTH
         humanoid.Health = DEFAULT_HEALTH
     end
+
+    return character:FindFirstChildOfClass("Humanoid") or character:WaitForChild("Humanoid", 10)
 end
 
 local function protectHumanoid(humanoid)
