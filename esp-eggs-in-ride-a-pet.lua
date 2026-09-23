@@ -1,7 +1,7 @@
 --//====================================================
---// RenderedEggs ESP + Egg Selector + Teleport
+--// RenderedEggs ESP + Egg Selector + Teleport Fling
 --// Optimized
---// X = shutdown toàn bộ
+--// X = Shutdown everything
 --//====================================================
 
 local Players = game:GetService("Players")
@@ -13,7 +13,7 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local Folder = workspace:FindFirstChild("RenderedEggs")
 
 if not Folder then
-    warn("[ESP] Không tìm thấy workspace.RenderedEggs")
+    warn("[ESP] workspace.RenderedEggs was not found")
     return
 end
 
@@ -59,7 +59,7 @@ Connections.CharacterAdded = LocalPlayer.CharacterAdded:Connect(function(charact
 end)
 
 --====================================================
--- FIND PART
+-- FIND ROOT PART
 --====================================================
 
 local function getRootPart(model)
@@ -101,14 +101,14 @@ Title.BackgroundTransparency = 1
 Title.Position = UDim2.fromOffset(12, 0)
 Title.Size = UDim2.new(1, -50, 0, 38)
 Title.Font = Enum.Font.GothamBold
-Title.Text = "RenderedEggs"
+Title.Text = "RenderedEggs ESP"
 Title.TextColor3 = Color3.new(1, 1, 1)
 Title.TextSize = 16
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = Main
 
 --====================================================
--- CLOSE
+-- CLOSE BUTTON
 --====================================================
 
 local Close = Instance.new("TextButton")
@@ -141,7 +141,7 @@ ToggleCorner.CornerRadius = UDim.new(0, 8)
 ToggleCorner.Parent = Toggle
 
 --====================================================
--- SELECTED LABEL
+-- SELECTED EGG LABEL
 --====================================================
 
 local SelectedLabel = Instance.new("TextLabel")
@@ -149,7 +149,7 @@ SelectedLabel.BackgroundTransparency = 1
 SelectedLabel.Position = UDim2.fromOffset(12, 82)
 SelectedLabel.Size = UDim2.new(1, -24, 0, 25)
 SelectedLabel.Font = Enum.Font.Gotham
-SelectedLabel.Text = "Đang chọn: Chưa chọn"
+SelectedLabel.Text = "Selected: None"
 SelectedLabel.TextColor3 = Color3.fromRGB(190, 190, 190)
 SelectedLabel.TextSize = 12
 SelectedLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -196,7 +196,7 @@ TeleportButton.Size = UDim2.new(1, -24, 0, 40)
 TeleportButton.BackgroundColor3 = Color3.fromRGB(70, 120, 210)
 TeleportButton.BorderSizePixel = 0
 TeleportButton.Font = Enum.Font.GothamBold
-TeleportButton.Text = "Teleport tới egg đã chọn"
+TeleportButton.Text = "Teleport + Fling"
 TeleportButton.TextColor3 = Color3.new(1, 1, 1)
 TeleportButton.TextSize = 13
 TeleportButton.Parent = Main
@@ -334,7 +334,7 @@ local function createEggButton(model)
         end
 
         SelectedEgg = model
-        SelectedLabel.Text = "Đang chọn: " .. model.Name
+        SelectedLabel.Text = "Selected: " .. model.Name
 
         for egg, btn in pairs(EggButtons) do
             if btn and btn.Parent then
@@ -361,7 +361,7 @@ local function removeEggButton(model)
 
     if SelectedEgg == model then
         SelectedEgg = nil
-        SelectedLabel.Text = "Đang chọn: Chưa chọn"
+        SelectedLabel.Text = "Selected: None"
     end
 end
 
@@ -444,7 +444,6 @@ task.spawn(function()
                         data.Billboard.Enabled = false
                     end
 
-                    -- Cập nhật khoảng cách trong danh sách
                     local button = EggButtons[model]
 
                     if button and button.Parent then
@@ -491,40 +490,61 @@ Toggle.MouseButton1Click:Connect(function()
 end)
 
 --====================================================
--- TELEPORT
+-- TELEPORT TO TOP OF EGG
 --====================================================
 
 TeleportButton.MouseButton1Click:Connect(function()
     if not SelectedEgg or not SelectedEgg.Parent then
-        SelectedLabel.Text = "Đang chọn: Egg không còn tồn tại"
+        SelectedLabel.Text = "Selected: Egg no longer exists"
         SelectedEgg = nil
         return
     end
 
-    local targetPart = getRootPart(SelectedEgg)
-
-    if not targetPart then
-        SelectedLabel.Text = "Đang chọn: Không tìm thấy vị trí egg"
+    Character = LocalPlayer.Character
+    if not Character then
         return
     end
 
-    Character = LocalPlayer.Character
-    RootPart = Character and Character:FindFirstChild("HumanoidRootPart")
-
+    RootPart = Character:FindFirstChild("HumanoidRootPart")
     if not RootPart then
         return
     end
 
-    -- Đặt phía trên egg một chút
-    RootPart.CFrame =
-        targetPart.CFrame + Vector3.new(0, 3, 0)
+    -- Get the real center and size of the whole egg
+    local eggCFrame, eggSize = SelectedEgg:GetBoundingBox()
+
+    -- Put the player directly above the egg
+    local heightOffset = 3
+
+    local targetPosition = Vector3.new(
+        eggCFrame.Position.X,
+        eggCFrame.Position.Y + (eggSize.Y / 2) + heightOffset,
+        eggCFrame.Position.Z
+    )
+
+    -- Stop all existing movement
+    RootPart.AssemblyLinearVelocity = Vector3.zero
+    RootPart.AssemblyAngularVelocity = Vector3.zero
+
+    -- Teleport directly above the egg
+    Character:PivotTo(
+        CFrame.new(targetPosition)
+    )
+
+    -- Clear velocity again after teleport
+    task.defer(function()
+        if RootPart and RootPart.Parent then
+            RootPart.AssemblyLinearVelocity = Vector3.zero
+            RootPart.AssemblyAngularVelocity = Vector3.zero
+        end
+    end)
 
     SelectedLabel.Text =
-        "Đã teleport: " .. SelectedEgg.Name
+        "Teleported above: " .. SelectedEgg.Name
 end)
 
 --====================================================
--- CLOSE EVERYTHING
+-- SHUTDOWN EVERYTHING
 --====================================================
 
 local function shutdown()
@@ -534,7 +554,7 @@ local function shutdown()
 
     Running = false
 
-    -- Xóa ESP
+    -- Remove ESP
     for model, data in pairs(ESPs) do
         if data.Billboard then
             data.Billboard:Destroy()
@@ -547,7 +567,7 @@ local function shutdown()
         ESPs[model] = nil
     end
 
-    -- Xóa connection chính
+    -- Disconnect all connections
     for _, connection in pairs(Connections) do
         if connection then
             connection:Disconnect()
@@ -556,7 +576,7 @@ local function shutdown()
 
     table.clear(Connections)
 
-    -- Xóa GUI
+    -- Destroy GUI completely
     ScreenGui:Destroy()
 end
 
@@ -611,4 +631,4 @@ Connections.InputChanged = UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
-print("[ESP] RenderedEggs ESP + Selector + Teleport loaded")
+print("[ESP] RenderedEggs ESP + Selector + Teleport Fling loaded")
