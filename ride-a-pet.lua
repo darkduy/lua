@@ -1,22 +1,22 @@
 --[[
-    ╔══════════════════════════════════════════════════════════════╗
-    ║              RENDERED EGGS ESP + TELEPORT                  ║
-    ║                                                              ║
-    ║  • ESP tất cả Egg trong workspace.RenderedEggs              ║
-    ║  • Hiện tên + khoảng cách (studs)                           ║
-    ║  • Nhóm Egg cùng tên                                        ║
-    ║  • Có thể thu gọn / mở rộng từng nhóm                      ║
-    ║  • ESP ON/OFF toàn bộ                                       ║
-    ║  • ESP ON/OFF từng loại Egg                                 ║
-    ║  • Search Egg                                               ║
-    ║  • Chọn Egg → Teleport                                      ║
-    ║  • Egg mới spawn tự động được phát hiện                     ║
-    ║  • TP cao hơn mặt trên Egg +5 studs                         ║
-    ║  • TP cao hơn mặt trên Baseplate plot +5 studs              ║
-    ║  • Tự tìm Plot của LocalPlayer qua Data.Owner               ║
-    ║  • Quét workspace.Plots tối đa 2 lần                        ║
-    ║  • Có kiểm tra khoảng cách / vị trí trước khi TP            ║
-    ╚══════════════════════════════════════════════════════════════╝
+╔══════════════════════════════════════════════════════════════════╗
+║                 RENDERED EGGS ESP + TELEPORT                  ║
+║                                                                  ║
+║ • ESP tất cả Model trong workspace.RenderedEggs                 ║
+║ • Hiện tên + khoảng cách                                        ║
+║ • Nhóm các Egg cùng tên                                         ║
+║ • Thu gọn / mở rộng nhóm                                        ║
+║ • ESP tổng ON/OFF                                                ║
+║ • ESP từng loại Egg ON/OFF                                      ║
+║ • Tìm kiếm Egg                                                   ║
+║ • Chọn Egg + Teleport                                            ║
+║ • Nút TP trực tiếp từng Egg                                     ║
+║ • Egg mới spawn tự động được phát hiện                           ║
+║ • Tự tìm Plot của LocalPlayer bằng Data.Owner                    ║
+║ • workspace.Plots chỉ được quét tối đa 2 lần                     ║
+║ • TP trên mặt Egg / Baseplate 5 studs                            ║
+║ • Không giới hạn khoảng cách TP ở phía script                    ║
+╚══════════════════════════════════════════════════════════════════╝
 ]]
 
 local Players = game:GetService("Players")
@@ -42,19 +42,16 @@ end
 -- SETTINGS
 --==============================================================
 
-local UPDATE_RATE = 0.25
-
+local UPDATE_RATE = 0.20
 local MAX_DISTANCE = 1000
 
+-- Khoảng cách thực tế phía trên vật thể
 local HEIGHT_OFFSET = 5
 
 local DEFAULT_ESP = true
-
 local SHOW_HIGHLIGHT = true
 
-local MAX_TELEPORT_DISTANCE = 3000
-
-local MAX_PLOT_SCANS = 2
+-- Không còn MAX_TELEPORT_DISTANCE
 
 
 --==============================================================
@@ -62,15 +59,11 @@ local MAX_PLOT_SCANS = 2
 --==============================================================
 
 local Running = true
-
 local GlobalESPEnabled = true
 
 local ESPs = {}
-
 local EggEntries = {}
-
 local EggGroups = {}
-
 local Connections = {}
 
 local SelectedEgg = nil
@@ -79,9 +72,10 @@ local Character = nil
 local RootPart = nil
 
 local PlotScanCount = 0
-
 local CachedMyPlot = nil
 local CachedBaseplate = nil
+
+local MAX_PLOT_SCANS = 2
 
 
 --==============================================================
@@ -111,6 +105,7 @@ local function getCharacter()
     Character = LocalPlayer.Character
 
     if not Character then
+        RootPart = nil
         return nil
     end
 
@@ -125,6 +120,10 @@ end
 
 getCharacter()
 
+
+--==============================================================
+-- CHARACTER
+--==============================================================
 
 Connections.CharacterAdded =
     LocalPlayer.CharacterAdded:Connect(function(character)
@@ -141,7 +140,7 @@ Connections.CharacterAdded =
 
 
 --==============================================================
--- FIND ROOT PART OF EGG
+-- FIND ROOT PART
 --==============================================================
 
 local function getRootPart(model)
@@ -151,11 +150,10 @@ local function getRootPart(model)
         return nil
     end
 
-    local primary = model.PrimaryPart
+    if model.PrimaryPart
+        and model.PrimaryPart:IsA("BasePart") then
 
-    if primary
-        and primary:IsA("BasePart") then
-        return primary
+        return model.PrimaryPart
     end
 
     local root =
@@ -165,6 +163,7 @@ local function getRootPart(model)
 
     if root
         and root:IsA("BasePart") then
+
         return root
     end
 
@@ -185,148 +184,14 @@ local function getEggTypeEnabled(model)
         return true
     end
 
-    local group = EggGroups[model.Name]
+    local group =
+        EggGroups[model.Name]
 
     if group then
         return group.TypeESPEnabled
     end
 
     return true
-end
-
-
---==============================================================
--- CREATE ESP
---==============================================================
-
-local function createESP(model)
-
-    if not model
-        or not model:IsA("Model")
-        or not model.Parent then
-        return
-    end
-
-    if ESPs[model] then
-        return
-    end
-
-    local root = getRootPart(model)
-
-    if not root then
-        return
-    end
-
-    local billboard =
-        Instance.new("BillboardGui")
-
-    billboard.Name = "EggESP"
-
-    billboard.Adornee = root
-
-    billboard.AlwaysOnTop = true
-
-    billboard.Size =
-        UDim2.new(
-            0,
-            180,
-            0,
-            45
-        )
-
-    billboard.StudsOffset =
-        Vector3.new(0, 2.5, 0)
-
-    billboard.Enabled =
-        GlobalESPEnabled
-        and getEggTypeEnabled(model)
-
-    billboard.Parent = root
-
-
-    local label =
-        Instance.new("TextLabel")
-
-    label.Name = "Info"
-
-    label.BackgroundTransparency = 1
-
-    label.Size =
-        UDim2.fromScale(1, 1)
-
-    label.Font =
-        Enum.Font.GothamBold
-
-    label.TextSize = 14
-
-    label.TextColor3 =
-        Color3.fromRGB(
-            255,
-            255,
-            255
-        )
-
-    label.TextStrokeTransparency = 0
-
-    label.Text =
-        model.Name
-
-    label.Parent = billboard
-
-
-    local highlight = nil
-
-    if SHOW_HIGHLIGHT then
-
-        highlight =
-            Instance.new("Highlight")
-
-        highlight.Name = "EggHighlight"
-
-        highlight.FillTransparency = 0.75
-
-        highlight.OutlineTransparency = 0
-
-        highlight.Enabled =
-            GlobalESPEnabled
-            and getEggTypeEnabled(model)
-
-        highlight.Adornee = model
-
-        highlight.Parent = model
-
-    end
-
-
-    ESPs[model] = {
-        Billboard = billboard,
-        Label = label,
-        Highlight = highlight
-    }
-end
-
-
---==============================================================
--- DESTROY ESP
---==============================================================
-
-local function destroyESP(model)
-
-    local esp = ESPs[model]
-
-    if not esp then
-        return
-    end
-
-    if esp.Billboard then
-        esp.Billboard:Destroy()
-    end
-
-    if esp.Highlight then
-        esp.Highlight:Destroy()
-    end
-
-    ESPs[model] = nil
 end
 
 
@@ -341,12 +206,15 @@ ScreenGui.Name =
     "RenderedEggESP"
 
 ScreenGui.ResetOnSpawn = false
-
 ScreenGui.ZIndexBehavior =
     Enum.ZIndexBehavior.Sibling
 
 ScreenGui.Parent = PlayerGui
 
+
+--==============================================================
+-- MAIN
+--==============================================================
 
 local Main =
     Instance.new("Frame")
@@ -356,23 +224,23 @@ Main.Name = "Main"
 Main.Size =
     UDim2.new(
         0,
-        390,
+        430,
         0,
-        520
+        560
     )
 
 Main.Position =
     UDim2.new(
         0.5,
-        -195,
+        -215,
         0.5,
-        -260
+        -280
     )
 
 Main.BackgroundColor3 =
     Color3.fromRGB(
-        25,
-        25,
+        22,
+        23,
         30
     )
 
@@ -385,9 +253,25 @@ local MainCorner =
     Instance.new("UICorner")
 
 MainCorner.CornerRadius =
-    UDim.new(0, 10)
+    UDim.new(0, 14)
 
 MainCorner.Parent = Main
+
+
+local MainStroke =
+    Instance.new("UIStroke")
+
+MainStroke.Color =
+    Color3.fromRGB(
+        75,
+        78,
+        100
+    )
+
+MainStroke.Thickness = 1.5
+MainStroke.Transparency = 0.2
+
+MainStroke.Parent = Main
 
 
 --==============================================================
@@ -402,19 +286,68 @@ TopBar.Size =
         1,
         0,
         0,
-        45
+        56
     )
 
 TopBar.BackgroundColor3 =
     Color3.fromRGB(
         35,
-        35,
-        42
+        36,
+        48
     )
 
 TopBar.BorderSizePixel = 0
 
 TopBar.Parent = Main
+
+
+local TopCorner =
+    Instance.new("UICorner")
+
+TopCorner.CornerRadius =
+    UDim.new(0, 14)
+
+TopCorner.Parent = TopBar
+
+
+local Accent =
+    Instance.new("Frame")
+
+Accent.Size =
+    UDim2.new(
+        0,
+        5,
+        1,
+        -18
+    )
+
+Accent.Position =
+    UDim2.new(
+        0,
+        9,
+        0,
+        9
+    )
+
+Accent.BackgroundColor3 =
+    Color3.fromRGB(
+        110,
+        130,
+        255
+    )
+
+Accent.BorderSizePixel = 0
+
+Accent.Parent = TopBar
+
+
+local AccentCorner =
+    Instance.new("UICorner")
+
+AccentCorner.CornerRadius =
+    UDim.new(1, 0)
+
+AccentCorner.Parent = Accent
 
 
 local Title =
@@ -425,38 +358,80 @@ Title.BackgroundTransparency = 1
 Title.Position =
     UDim2.new(
         0,
-        12,
+        25,
         0,
-        0
+        7
     )
 
 Title.Size =
     UDim2.new(
         1,
-        -60,
-        1,
-        0
+        -90,
+        0,
+        24
     )
 
 Title.Font =
     Enum.Font.GothamBold
 
-Title.TextSize = 16
+Title.TextSize = 17
+
+Title.TextColor3 =
+    Color3.fromRGB(
+        245,
+        245,
+        255
+    )
 
 Title.TextXAlignment =
     Enum.TextXAlignment.Left
 
-Title.TextColor3 =
-    Color3.fromRGB(
-        255,
-        255,
-        255
-    )
-
 Title.Text =
-    "Rendered Eggs ESP"
+    "Rendered Eggs"
 
 Title.Parent = TopBar
+
+
+local Subtitle =
+    Instance.new("TextLabel")
+
+Subtitle.BackgroundTransparency = 1
+
+Subtitle.Position =
+    UDim2.new(
+        0,
+        25,
+        0,
+        30
+    )
+
+Subtitle.Size =
+    UDim2.new(
+        1,
+        -90,
+        0,
+        17
+    )
+
+Subtitle.Font =
+    Enum.Font.Gotham
+
+Subtitle.TextSize = 10
+
+Subtitle.TextColor3 =
+    Color3.fromRGB(
+        155,
+        158,
+        175
+    )
+
+Subtitle.TextXAlignment =
+    Enum.TextXAlignment.Left
+
+Subtitle.Text =
+    "ESP • Search • Teleport"
+
+Subtitle.Parent = TopBar
 
 
 local Close =
@@ -465,9 +440,9 @@ local Close =
 Close.Size =
     UDim2.new(
         0,
-        40,
+        36,
         0,
-        35
+        36
     )
 
 Close.Position =
@@ -475,18 +450,18 @@ Close.Position =
         1,
         -45,
         0,
-        5
+        10
     )
 
 Close.BackgroundColor3 =
     Color3.fromRGB(
         180,
-        55,
-        55
+        60,
+        70
     )
 
 Close.Text =
-    "X"
+    "×"
 
 Close.TextColor3 =
     Color3.fromRGB(
@@ -498,7 +473,7 @@ Close.TextColor3 =
 Close.Font =
     Enum.Font.GothamBold
 
-Close.TextSize = 16
+Close.TextSize = 20
 
 Close.Parent = TopBar
 
@@ -507,13 +482,13 @@ local CloseCorner =
     Instance.new("UICorner")
 
 CloseCorner.CornerRadius =
-    UDim.new(0, 7)
+    UDim.new(0, 9)
 
 CloseCorner.Parent = Close
 
 
 --==============================================================
--- GLOBAL ESP BUTTON
+-- CONTROL BUTTONS
 --==============================================================
 
 local GlobalToggle =
@@ -522,23 +497,28 @@ local GlobalToggle =
 GlobalToggle.Size =
     UDim2.new(
         0,
-        110,
+        125,
         0,
-        35
+        38
     )
 
 GlobalToggle.Position =
     UDim2.new(
         0,
-        10,
+        12,
         0,
-        55
+        69
     )
 
-GlobalToggle.Font =
-    Enum.Font.GothamBold
+GlobalToggle.BackgroundColor3 =
+    Color3.fromRGB(
+        60,
+        155,
+        95
+    )
 
-GlobalToggle.TextSize = 13
+GlobalToggle.Text =
+    "ESP  •  ON"
 
 GlobalToggle.TextColor3 =
     Color3.fromRGB(
@@ -547,15 +527,10 @@ GlobalToggle.TextColor3 =
         255
     )
 
-GlobalToggle.BackgroundColor3 =
-    Color3.fromRGB(
-        50,
-        120,
-        70
-    )
+GlobalToggle.Font =
+    Enum.Font.GothamBold
 
-GlobalToggle.Text =
-    "ESP: ON"
+GlobalToggle.TextSize = 12
 
 GlobalToggle.Parent = Main
 
@@ -564,14 +539,10 @@ local GlobalCorner =
     Instance.new("UICorner")
 
 GlobalCorner.CornerRadius =
-    UDim.new(0, 7)
+    UDim.new(0, 9)
 
 GlobalCorner.Parent = GlobalToggle
 
-
---==============================================================
--- PLOT TP BUTTON
---==============================================================
 
 local PlotTP =
     Instance.new("TextButton")
@@ -579,23 +550,28 @@ local PlotTP =
 PlotTP.Size =
     UDim2.new(
         0,
-        130,
+        140,
         0,
-        35
+        38
     )
 
 PlotTP.Position =
     UDim2.new(
         0,
-        130,
+        145,
         0,
-        55
+        69
     )
 
-PlotTP.Font =
-    Enum.Font.GothamBold
+PlotTP.BackgroundColor3 =
+    Color3.fromRGB(
+        78,
+        100,
+        185
+    )
 
-PlotTP.TextSize = 13
+PlotTP.Text =
+    "My Plot"
 
 PlotTP.TextColor3 =
     Color3.fromRGB(
@@ -604,15 +580,10 @@ PlotTP.TextColor3 =
         255
     )
 
-PlotTP.BackgroundColor3 =
-    Color3.fromRGB(
-        70,
-        90,
-        150
-    )
+PlotTP.Font =
+    Enum.Font.GothamBold
 
-PlotTP.Text =
-    "TP My Plot"
+PlotTP.TextSize = 12
 
 PlotTP.Parent = Main
 
@@ -621,57 +592,176 @@ local PlotTPCorner =
     Instance.new("UICorner")
 
 PlotTPCorner.CornerRadius =
-    UDim.new(0, 7)
+    UDim.new(0, 9)
 
 PlotTPCorner.Parent = PlotTP
+
+
+local CountLabel =
+    Instance.new("TextLabel")
+
+CountLabel.Size =
+    UDim2.new(
+        0,
+        125,
+        0,
+        38
+    )
+
+CountLabel.Position =
+    UDim2.new(
+        1,
+        -137,
+        0,
+        69
+    )
+
+CountLabel.BackgroundColor3 =
+    Color3.fromRGB(
+        35,
+        36,
+        47
+    )
+
+CountLabel.Text =
+    "Egg: 0"
+
+CountLabel.TextColor3 =
+    Color3.fromRGB(
+        220,
+        222,
+        235
+    )
+
+CountLabel.Font =
+    Enum.Font.GothamBold
+
+CountLabel.TextSize = 12
+
+CountLabel.Parent = Main
+
+
+local CountCorner =
+    Instance.new("UICorner")
+
+CountCorner.CornerRadius =
+    UDim.new(0, 9)
+
+CountCorner.Parent = CountLabel
 
 
 --==============================================================
 -- SEARCH
 --==============================================================
 
-local Search =
-    Instance.new("TextBox")
+local SearchBox =
+    Instance.new("Frame")
 
-Search.Size =
+SearchBox.Size =
     UDim2.new(
         1,
-        -20,
+        -24,
         0,
-        35
+        40
     )
+
+SearchBox.Position =
+    UDim2.new(
+        0,
+        12,
+        0,
+        117
+    )
+
+SearchBox.BackgroundColor3 =
+    Color3.fromRGB(
+        32,
+        33,
+        43
+    )
+
+SearchBox.BorderSizePixel = 0
+
+SearchBox.Parent = Main
+
+
+local SearchCorner =
+    Instance.new("UICorner")
+
+SearchCorner.CornerRadius =
+    UDim.new(0, 9)
+
+SearchCorner.Parent = SearchBox
+
+
+local SearchIcon =
+    Instance.new("TextLabel")
+
+SearchIcon.Size =
+    UDim2.new(
+        0,
+        35,
+        1,
+        0
+    )
+
+SearchIcon.BackgroundTransparency = 1
+
+SearchIcon.Text =
+    "⌕"
+
+SearchIcon.TextColor3 =
+    Color3.fromRGB(
+        155,
+        160,
+        180
+    )
+
+SearchIcon.Font =
+    Enum.Font.GothamBold
+
+SearchIcon.TextSize = 20
+
+SearchIcon.Parent = SearchBox
+
+
+local Search =
+    Instance.new("TextBox")
 
 Search.Position =
     UDim2.new(
         0,
-        10,
+        34,
         0,
-        100
+        0
     )
 
-Search.BackgroundColor3 =
-    Color3.fromRGB(
-        40,
-        40,
-        47
+Search.Size =
+    UDim2.new(
+        1,
+        -40,
+        1,
+        0
     )
+
+Search.BackgroundTransparency = 1
 
 Search.TextColor3 =
     Color3.fromRGB(
-        255,
-        255,
-        255
+        240,
+        240,
+        248
     )
 
 Search.PlaceholderColor3 =
     Color3.fromRGB(
-        150,
-        150,
-        150
+        125,
+        128,
+        145
     )
 
 Search.PlaceholderText =
-    "Search egg..."
+    "Search egg type..."
 
 Search.Text =
     ""
@@ -681,23 +771,57 @@ Search.ClearTextOnFocus = false
 Search.Font =
     Enum.Font.Gotham
 
-Search.TextSize = 13
+Search.TextSize = 12
 
-Search.Parent = Main
+Search.TextXAlignment =
+    Enum.TextXAlignment.Left
+
+Search.Parent = SearchBox
 
 
-local SearchCorner =
+--==============================================================
+-- SELECTED
+--==============================================================
+
+local SelectedBox =
+    Instance.new("Frame")
+
+SelectedBox.Size =
+    UDim2.new(
+        1,
+        -24,
+        0,
+        36
+    )
+
+SelectedBox.Position =
+    UDim2.new(
+        0,
+        12,
+        0,
+        165
+    )
+
+SelectedBox.BackgroundColor3 =
+    Color3.fromRGB(
+        29,
+        30,
+        39
+    )
+
+SelectedBox.BorderSizePixel = 0
+
+SelectedBox.Parent = Main
+
+
+local SelectedCorner =
     Instance.new("UICorner")
 
-SearchCorner.CornerRadius =
-    UDim.new(0, 7)
+SelectedCorner.CornerRadius =
+    UDim.new(0, 8)
 
-SearchCorner.Parent = Search
+SelectedCorner.Parent = SelectedBox
 
-
---==============================================================
--- SELECTED LABEL
---==============================================================
 
 local SelectedLabel =
     Instance.new("TextLabel")
@@ -705,17 +829,17 @@ local SelectedLabel =
 SelectedLabel.Size =
     UDim2.new(
         1,
-        -20,
-        0,
-        30
+        -18,
+        1,
+        0
     )
 
 SelectedLabel.Position =
     UDim2.new(
         0,
-        10,
+        9,
         0,
-        140
+        0
     )
 
 SelectedLabel.BackgroundTransparency = 1
@@ -723,13 +847,13 @@ SelectedLabel.BackgroundTransparency = 1
 SelectedLabel.Font =
     Enum.Font.Gotham
 
-SelectedLabel.TextSize = 13
+SelectedLabel.TextSize = 11
 
 SelectedLabel.TextColor3 =
     Color3.fromRGB(
-        210,
-        210,
-        210
+        170,
+        174,
+        190
     )
 
 SelectedLabel.TextXAlignment =
@@ -738,7 +862,53 @@ SelectedLabel.TextXAlignment =
 SelectedLabel.Text =
     "Selected: None"
 
-SelectedLabel.Parent = Main
+SelectedLabel.Parent = SelectedBox
+
+
+--==============================================================
+-- LIST TITLE
+--==============================================================
+
+local ListTitle =
+    Instance.new("TextLabel")
+
+ListTitle.Size =
+    UDim2.new(
+        1,
+        -24,
+        0,
+        24
+    )
+
+ListTitle.Position =
+    UDim2.new(
+        0,
+        12,
+        0,
+        208
+    )
+
+ListTitle.BackgroundTransparency = 1
+
+ListTitle.Font =
+    Enum.Font.GothamBold
+
+ListTitle.TextSize = 12
+
+ListTitle.TextColor3 =
+    Color3.fromRGB(
+        220,
+        223,
+        238
+    )
+
+ListTitle.TextXAlignment =
+    Enum.TextXAlignment.Left
+
+ListTitle.Text =
+    "EGG TYPES"
+
+ListTitle.Parent = Main
 
 
 --==============================================================
@@ -751,29 +921,31 @@ local List =
 List.Size =
     UDim2.new(
         1,
-        -20,
+        -24,
         0,
-        280
+        260
     )
 
 List.Position =
     UDim2.new(
         0,
-        10,
+        12,
         0,
-        170
+        233
     )
 
 List.BackgroundColor3 =
     Color3.fromRGB(
-        30,
-        30,
+        27,
+        28,
         36
     )
 
 List.BorderSizePixel = 0
 
-List.ScrollBarThickness = 5
+List.ScrollBarThickness = 4
+
+List.ScrollBarImageTransparency = 0.25
 
 List.CanvasSize =
     UDim2.new(
@@ -783,7 +955,37 @@ List.CanvasSize =
         0
     )
 
+List.AutomaticCanvasSize =
+    Enum.AutomaticSize.None
+
 List.Parent = Main
+
+
+local ListCorner =
+    Instance.new("UICorner")
+
+ListCorner.CornerRadius =
+    UDim.new(0, 10)
+
+ListCorner.Parent = List
+
+
+local ListPadding =
+    Instance.new("UIPadding")
+
+ListPadding.PaddingTop =
+    UDim.new(0, 5)
+
+ListPadding.PaddingBottom =
+    UDim.new(0, 5)
+
+ListPadding.PaddingLeft =
+    UDim.new(0, 5)
+
+ListPadding.PaddingRight =
+    UDim.new(0, 5)
+
+ListPadding.Parent = List
 
 
 local ListLayout =
@@ -807,68 +1009,10 @@ ListLayout:GetPropertyChangedSignal(
             0,
             0,
             0,
-            ListLayout.AbsoluteContentSize.Y + 8
+            ListLayout.AbsoluteContentSize.Y + 12
         )
 
 end)
-
-
---==============================================================
--- TP SELECTED EGG
---==============================================================
-
-local TeleportEgg =
-    Instance.new("TextButton")
-
-TeleportEgg.Size =
-    UDim2.new(
-        1,
-        -20,
-        0,
-        38
-    )
-
-TeleportEgg.Position =
-    UDim2.new(
-        0,
-        10,
-        0,
-        458
-    )
-
-TeleportEgg.BackgroundColor3 =
-    Color3.fromRGB(
-        65,
-        105,
-        170
-    )
-
-TeleportEgg.TextColor3 =
-    Color3.fromRGB(
-        255,
-        255,
-        255
-    )
-
-TeleportEgg.Font =
-    Enum.Font.GothamBold
-
-TeleportEgg.TextSize = 13
-
-TeleportEgg.Text =
-    "TP Above Egg"
-
-TeleportEgg.Parent = Main
-
-
-local TeleportCorner =
-    Instance.new("UICorner")
-
-TeleportCorner.CornerRadius =
-    UDim.new(0, 7)
-
-TeleportCorner.Parent =
-    TeleportEgg
 
 
 --==============================================================
@@ -881,17 +1025,17 @@ local Status =
 Status.Size =
     UDim2.new(
         1,
-        -20,
+        -24,
         0,
-        25
+        28
     )
 
 Status.Position =
     UDim2.new(
         0,
-        10,
+        12,
         0,
-        425
+        500
     )
 
 Status.BackgroundTransparency = 1
@@ -899,102 +1043,330 @@ Status.BackgroundTransparency = 1
 Status.Font =
     Enum.Font.Gotham
 
-Status.TextSize = 12
+Status.TextSize = 11
 
 Status.TextColor3 =
     Color3.fromRGB(
-        170,
-        170,
-        170
+        145,
+        149,
+        165
     )
 
 Status.TextXAlignment =
     Enum.TextXAlignment.Left
 
 Status.Text =
-    "Đang quét Egg..."
+    "Đang khởi tạo..."
 
 Status.Parent = Main
 
 
 --==============================================================
--- DRAG GUI
+-- TELEPORT BUTTON
+--==============================================================
+
+local TeleportEgg =
+    Instance.new("TextButton")
+
+TeleportEgg.Size =
+    UDim2.new(
+        0,
+        145,
+        0,
+        38
+    )
+
+TeleportEgg.Position =
+    UDim2.new(
+        1,
+        -157,
+        0,
+        495
+    )
+
+TeleportEgg.BackgroundColor3 =
+    Color3.fromRGB(
+        95,
+        115,
+        210
+    )
+
+TeleportEgg.Text =
+    "Teleport"
+
+TeleportEgg.TextColor3 =
+    Color3.fromRGB(
+        255,
+        255,
+        255
+    )
+
+TeleportEgg.Font =
+    Enum.Font.GothamBold
+
+TeleportEgg.TextSize = 12
+
+TeleportEgg.Parent = Main
+
+
+local TeleportCorner =
+    Instance.new("UICorner")
+
+TeleportCorner.CornerRadius =
+    UDim.new(0, 9)
+
+TeleportCorner.Parent = TeleportEgg
+
+
+--==============================================================
+-- DRAG
 --==============================================================
 
 local dragging = false
-local dragStart
-local startPosition
+local dragStart = nil
+local startPosition = nil
 
 
-TopBar.InputBegan:Connect(
-    function(input)
+TopBar.InputBegan:Connect(function(input)
 
-        if input.UserInputType ==
-            Enum.UserInputType.MouseButton1
-            or input.UserInputType ==
-            Enum.UserInputType.Touch then
+    if input.UserInputType ==
+        Enum.UserInputType.MouseButton1
+        or input.UserInputType ==
+        Enum.UserInputType.Touch then
 
-            dragging = true
+        dragging = true
 
-            dragStart =
-                input.Position
+        dragStart =
+            input.Position
 
-            startPosition =
-                Main.Position
-
-        end
+        startPosition =
+            Main.Position
 
     end
-)
+
+end)
 
 
-TopBar.InputEnded:Connect(
-    function(input)
+TopBar.InputEnded:Connect(function(input)
 
-        if input.UserInputType ==
-            Enum.UserInputType.MouseButton1
-            or input.UserInputType ==
-            Enum.UserInputType.Touch then
+    if input.UserInputType ==
+        Enum.UserInputType.MouseButton1
+        or input.UserInputType ==
+        Enum.UserInputType.Touch then
 
-            dragging = false
-
-        end
+        dragging = false
 
     end
-)
+
+end)
 
 
-UserInputService.InputChanged:Connect(
-    function(input)
+Connections.InputChanged =
+    UserInputService.InputChanged:Connect(
+        function(input)
 
-        if not dragging then
-            return
+            if not dragging then
+                return
+            end
+
+            if input.UserInputType ~=
+                Enum.UserInputType.MouseMovement
+                and input.UserInputType ~=
+                Enum.UserInputType.Touch then
+
+                return
+
+            end
+
+
+            local delta =
+                input.Position - dragStart
+
+
+            Main.Position =
+                UDim2.new(
+                    startPosition.X.Scale,
+                    startPosition.X.Offset
+                        + delta.X,
+
+                    startPosition.Y.Scale,
+                    startPosition.Y.Offset
+                        + delta.Y
+                )
+
         end
-
-        if input.UserInputType ~=
-            Enum.UserInputType.MouseMovement
-            and input.UserInputType ~=
-            Enum.UserInputType.Touch then
-            return
-        end
-
-        local delta =
-            input.Position - dragStart
-
-        Main.Position =
-            UDim2.new(
-                startPosition.X.Scale,
-                startPosition.X.Offset + delta.X,
-                startPosition.Y.Scale,
-                startPosition.Y.Offset + delta.Y
-            )
-
-    end
-)
+    )
 
 
 --==============================================================
--- CREATE EGG GROUP
+-- CREATE ESP
+--==============================================================
+
+local function createESP(model)
+
+    if not model
+        or not model:IsA("Model")
+        or not model.Parent then
+
+        return
+
+    end
+
+
+    if ESPs[model] then
+        return
+    end
+
+
+    local root =
+        getRootPart(model)
+
+
+    if not root then
+        return
+    end
+
+
+    local billboard =
+        Instance.new("BillboardGui")
+
+    billboard.Name =
+        "EggESP"
+
+    billboard.Adornee =
+        root
+
+    billboard.AlwaysOnTop = true
+
+    billboard.Size =
+        UDim2.new(
+            0,
+            190,
+            0,
+            44
+        )
+
+    billboard.StudsOffset =
+        Vector3.new(
+            0,
+            2.5,
+            0
+        )
+
+    billboard.Enabled =
+        GlobalESPEnabled
+        and getEggTypeEnabled(model)
+
+    billboard.Parent =
+        root
+
+
+    local label =
+        Instance.new("TextLabel")
+
+    label.Name =
+        "Info"
+
+    label.Size =
+        UDim2.fromScale(
+            1,
+            1
+        )
+
+    label.BackgroundTransparency = 1
+
+    label.Font =
+        Enum.Font.GothamBold
+
+    label.TextSize = 13
+
+    label.TextColor3 =
+        Color3.fromRGB(
+            255,
+            255,
+            255
+        )
+
+    label.TextStrokeTransparency =
+        0.15
+
+    label.Text =
+        model.Name
+
+    label.Parent =
+        billboard
+
+
+    local highlight = nil
+
+
+    if SHOW_HIGHLIGHT then
+
+        highlight =
+            Instance.new("Highlight")
+
+        highlight.Name =
+            "EggHighlight"
+
+        highlight.FillTransparency =
+            0.78
+
+        highlight.OutlineTransparency =
+            0.1
+
+        highlight.Adornee =
+            model
+
+        highlight.Enabled =
+            GlobalESPEnabled
+            and getEggTypeEnabled(model)
+
+        highlight.Parent =
+            model
+
+    end
+
+
+    ESPs[model] = {
+        Billboard = billboard,
+        Label = label,
+        Highlight = highlight
+    }
+
+end
+
+
+--==============================================================
+-- DESTROY ESP
+--==============================================================
+
+local function destroyESP(model)
+
+    local esp =
+        ESPs[model]
+
+    if not esp then
+        return
+    end
+
+
+    if esp.Billboard then
+        esp.Billboard:Destroy()
+    end
+
+
+    if esp.Highlight then
+        esp.Highlight:Destroy()
+    end
+
+
+    ESPs[model] = nil
+
+end
+
+
+--==============================================================
+-- CREATE GROUP
 --==============================================================
 
 local function createEggGroup(groupName)
@@ -1002,6 +1374,7 @@ local function createEggGroup(groupName)
     if EggGroups[groupName] then
         return EggGroups[groupName]
     end
+
 
     local group = {
 
@@ -1013,7 +1386,9 @@ local function createEggGroup(groupName)
 
         TypeESPEnabled = true,
 
-        Frame = nil,
+        Header = nil,
+
+        Container = nil,
 
         HeaderTitle = nil,
 
@@ -1031,19 +1406,31 @@ local function createEggGroup(groupName)
     Header.Size =
         UDim2.new(
             1,
-            -8,
+            -2,
             0,
-            32
+            34
         )
 
     Header.BackgroundColor3 =
         Color3.fromRGB(
-            50,
-            50,
-            60
+            41,
+            42,
+            54
         )
 
+    Header.BorderSizePixel = 0
+
     Header.Parent = List
+
+
+    local HeaderCorner =
+        Instance.new("UICorner")
+
+    HeaderCorner.CornerRadius =
+        UDim.new(0, 7)
+
+    HeaderCorner.Parent =
+        Header
 
 
     local Toggle =
@@ -1052,32 +1439,33 @@ local function createEggGroup(groupName)
     Toggle.Size =
         UDim2.new(
             1,
-            -80,
+            -82,
             1,
             0
         )
 
     Toggle.BackgroundTransparency = 1
 
-    Toggle.Font =
-        Enum.Font.GothamBold
-
-    Toggle.TextSize = 13
-
-    Toggle.TextColor3 =
-        Color3.fromRGB(
-            255,
-            255,
-            255
-        )
-
     Toggle.TextXAlignment =
         Enum.TextXAlignment.Left
 
-    Toggle.Text =
-        "▼ " .. groupName
+    Toggle.Font =
+        Enum.Font.GothamBold
 
-    Toggle.Parent = Header
+    Toggle.TextSize = 11
+
+    Toggle.TextColor3 =
+        Color3.fromRGB(
+            235,
+            237,
+            248
+        )
+
+    Toggle.Text =
+        "▼  " .. groupName
+
+    Toggle.Parent =
+        Header
 
 
     local TypeESP =
@@ -1094,20 +1482,20 @@ local function createEggGroup(groupName)
     TypeESP.Position =
         UDim2.new(
             1,
-            -74,
+            -75,
             0,
-            3
+            4
         )
 
     TypeESP.BackgroundColor3 =
         Color3.fromRGB(
-            50,
-            120,
-            70
+            60,
+            145,
+            90
         )
 
     TypeESP.Text =
-        "ESP ON"
+        "ESP"
 
     TypeESP.TextColor3 =
         Color3.fromRGB(
@@ -1119,18 +1507,32 @@ local function createEggGroup(groupName)
     TypeESP.Font =
         Enum.Font.GothamBold
 
-    TypeESP.TextSize = 11
+    TypeESP.TextSize = 10
 
-    TypeESP.Parent = Header
+    TypeESP.Parent =
+        Header
+
+
+    local TypeCorner =
+        Instance.new("UICorner")
+
+    TypeCorner.CornerRadius =
+        UDim.new(0, 6)
+
+    TypeCorner.Parent =
+        TypeESP
 
 
     local Container =
         Instance.new("Frame")
 
+    Container.Name =
+        "Container"
+
     Container.Size =
         UDim2.new(
             1,
-            -8,
+            -2,
             0,
             0
         )
@@ -1142,7 +1544,8 @@ local function createEggGroup(groupName)
 
     Container.Visible = true
 
-    Container.Parent = List
+    Container.Parent =
+        List
 
 
     local ContainerLayout =
@@ -1155,13 +1558,21 @@ local function createEggGroup(groupName)
         Container
 
 
-    group.Frame = Container
+    group.Header =
+        Header
 
-    group.HeaderTitle = Toggle
+    group.Container =
+        Container
 
-    group.TypeESPButton = TypeESP
+    group.HeaderTitle =
+        Toggle
 
-    EggGroups[groupName] = group
+    group.TypeESPButton =
+        TypeESP
+
+
+    EggGroups[groupName] =
+        group
 
 
     Toggle.MouseButton1Click:Connect(
@@ -1173,15 +1584,16 @@ local function createEggGroup(groupName)
             Container.Visible =
                 group.Expanded
 
+
             if group.Expanded then
 
                 Toggle.Text =
-                    "▼ " .. groupName
+                    "▼  " .. groupName
 
             else
 
                 Toggle.Text =
-                    "▶ " .. groupName
+                    "▶  " .. groupName
 
             end
 
@@ -1195,37 +1607,41 @@ local function createEggGroup(groupName)
             group.TypeESPEnabled =
                 not group.TypeESPEnabled
 
+
             if group.TypeESPEnabled then
 
                 TypeESP.Text =
-                    "ESP ON"
+                    "ESP"
 
                 TypeESP.BackgroundColor3 =
                     Color3.fromRGB(
-                        50,
-                        120,
-                        70
+                        60,
+                        145,
+                        90
                     )
 
             else
 
                 TypeESP.Text =
-                    "ESP OFF"
+                    "OFF"
 
                 TypeESP.BackgroundColor3 =
                     Color3.fromRGB(
-                        120,
-                        55,
-                        55
+                        145,
+                        65,
+                        75
                     )
 
             end
 
 
-            for model in pairs(group.Eggs) do
+            for model in pairs(
+                group.Eggs
+            ) do
 
                 local esp =
                     ESPs[model]
+
 
                 if esp then
 
@@ -1233,12 +1649,16 @@ local function createEggGroup(groupName)
                         GlobalESPEnabled
                         and group.TypeESPEnabled
 
+
                     esp.Billboard.Enabled =
                         enabled
 
+
                     if esp.Highlight then
+
                         esp.Highlight.Enabled =
                             enabled
+
                     end
 
                 end
@@ -1250,54 +1670,8 @@ local function createEggGroup(groupName)
 
 
     return group
-end
-
-
---==============================================================
--- FILTER SEARCH
---==============================================================
-
-local function updateSearch()
-
-    local query =
-        string.lower(
-            Search.Text or ""
-        )
-
-
-    for _, entry in pairs(EggEntries) do
-
-        if entry.Model
-            and entry.Frame
-            and entry.Model.Parent then
-
-            local name =
-                string.lower(
-                    entry.Model.Name
-                )
-
-            local visible =
-                query == ""
-                or string.find(
-                    name,
-                    query,
-                    1,
-                    true
-                ) ~= nil
-
-            entry.Frame.Visible =
-                visible
-
-        end
-
-    end
 
 end
-
-
-Search:GetPropertyChangedSignal(
-    "Text"
-):Connect(updateSearch)
 
 
 --==============================================================
@@ -1310,10 +1684,13 @@ local function createEggEntry(model)
         return
     end
 
+
     if not model
         or not model:IsA("Model")
         or not model.Parent then
+
         return
+
     end
 
 
@@ -1337,18 +1714,30 @@ local function createEggEntry(model)
             1,
             -4,
             0,
-            30
+            32
         )
 
     Row.BackgroundColor3 =
         Color3.fromRGB(
-            42,
-            42,
-            50
+            35,
+            36,
+            46
         )
 
+    Row.BorderSizePixel = 0
+
     Row.Parent =
-        group.Frame
+        group.Container
+
+
+    local RowCorner =
+        Instance.new("UICorner")
+
+    RowCorner.CornerRadius =
+        UDim.new(0, 6)
+
+    RowCorner.Parent =
+        Row
 
 
     local Select =
@@ -1357,8 +1746,16 @@ local function createEggEntry(model)
     Select.Size =
         UDim2.new(
             1,
-            -70,
+            -72,
             1,
+            0
+        )
+
+    Select.Position =
+        UDim2.new(
+            0,
+            8,
+            0,
             0
         )
 
@@ -1369,9 +1766,9 @@ local function createEggEntry(model)
 
     Select.TextColor3 =
         Color3.fromRGB(
-            230,
-            230,
-            230
+            220,
+            222,
+            235
         )
 
     Select.TextXAlignment =
@@ -1380,9 +1777,10 @@ local function createEggEntry(model)
     Select.Font =
         Enum.Font.Gotham
 
-    Select.TextSize = 12
+    Select.TextSize = 11
 
-    Select.Parent = Row
+    Select.Parent =
+        Row
 
 
     local TP =
@@ -1391,24 +1789,24 @@ local function createEggEntry(model)
     TP.Size =
         UDim2.new(
             0,
-            62,
+            58,
             0,
-            25
+            26
         )
 
     TP.Position =
         UDim2.new(
             1,
-            -65,
+            -63,
             0,
-            2
+            3
         )
 
     TP.BackgroundColor3 =
         Color3.fromRGB(
-            65,
-            105,
-            170
+            77,
+            97,
+            175
         )
 
     TP.Text =
@@ -1424,18 +1822,20 @@ local function createEggEntry(model)
     TP.Font =
         Enum.Font.GothamBold
 
-    TP.TextSize = 11
+    TP.TextSize = 10
 
-    TP.Parent = Row
+    TP.Parent =
+        Row
 
 
-    local corner =
+    local TPCorner =
         Instance.new("UICorner")
 
-    corner.CornerRadius =
-        UDim.new(0, 5)
+    TPCorner.CornerRadius =
+        UDim.new(0, 6)
 
-    corner.Parent = TP
+    TPCorner.Parent =
+        TP
 
 
     local entry = {
@@ -1451,7 +1851,8 @@ local function createEggEntry(model)
     }
 
 
-    EggEntries[model] = entry
+    EggEntries[model] =
+        entry
 
 
     Select.MouseButton1Click:Connect(
@@ -1459,10 +1860,15 @@ local function createEggEntry(model)
 
             if not model
                 or not model.Parent then
+
                 return
+
             end
 
-            SelectedEgg = model
+
+            SelectedEgg =
+                model
+
 
             SelectedLabel.Text =
                 "Selected: "
@@ -1479,6 +1885,7 @@ local function createEggEntry(model)
                 return
             end
 
+
             if not model
                 or not model.Parent then
 
@@ -1486,10 +1893,12 @@ local function createEggEntry(model)
                     "Egg không còn tồn tại"
 
                 return
+
             end
 
 
             getCharacter()
+
 
             if not Character
                 or not RootPart then
@@ -1498,16 +1907,20 @@ local function createEggEntry(model)
                     "Không tìm thấy nhân vật"
 
                 return
+
             end
 
 
             local target =
-                getEggTopCFrame(model)
+                getEggTopCFrame(
+                    model
+                )
+
 
             if not target then
 
                 Status.Text =
-                    "Egg chưa sẵn sàng để TP"
+                    "Egg chưa sẵn sàng"
 
                 return
 
@@ -1524,8 +1937,15 @@ local function createEggEntry(model)
 
             if success then
 
+                SelectedEgg =
+                    model
+
+                SelectedLabel.Text =
+                    "Selected: "
+                    .. model.Name
+
                 Status.Text =
-                    "Đã TP tới "
+                    "Đã teleport tới "
                     .. model.Name
 
             else
@@ -1552,33 +1972,43 @@ local function registerModel(model)
         return
     end
 
+
     if not model
         or not model:IsA("Model")
         or not model.Parent then
+
         return
+
     end
+
 
     if not model:IsDescendantOf(
         RenderedEggs
     ) then
+
         return
+
     end
 
 
     if not EggEntries[model] then
+
         createEggEntry(model)
+
     end
 
 
     if not ESPs[model] then
+
         createESP(model)
+
     end
 
 end
 
 
 --==============================================================
--- WAIT FOR NEW SPAWNED EGG
+-- NEW EGG SPAWN HANDLER
 --==============================================================
 
 local function tryRegisterEgg(object)
@@ -1587,15 +2017,21 @@ local function tryRegisterEgg(object)
         return
     end
 
+
     if not object
         or not object:IsA("Model") then
+
         return
+
     end
+
 
     if not object:IsDescendantOf(
         RenderedEggs
     ) then
+
         return
+
     end
 
 
@@ -1606,7 +2042,9 @@ local function tryRegisterEgg(object)
             or not object:IsDescendantOf(
                 RenderedEggs
             ) then
+
             return
+
         end
 
 
@@ -1627,11 +2065,7 @@ local function tryRegisterEgg(object)
             end
 
 
-            local root =
-                getRootPart(object)
-
-
-            if root then
+            if getRootPart(object) then
                 break
             end
 
@@ -1652,7 +2086,6 @@ local function tryRegisterEgg(object)
         end
 
 
-        -- Đăng ký sau khi Egg đã có part
         registerModel(object)
 
     end)
@@ -1678,7 +2111,7 @@ end
 
 
 --==============================================================
--- NEW EGG DETECTION
+-- NEW DESCENDANTS
 --==============================================================
 
 Connections.DescendantAdded =
@@ -1692,75 +2125,7 @@ Connections.DescendantAdded =
 
 
 --==============================================================
--- TOP SURFACE OF BASEPLATE
---==============================================================
-
-local function getBaseplateTopCFrame(
-    baseplate
-)
-
-    if not baseplate
-        or not baseplate:IsA("BasePart")
-        or not baseplate.Parent then
-
-        return nil
-
-    end
-
-
-    local size =
-        baseplate.Size
-
-    local cf =
-        baseplate.CFrame
-
-
-    if not isFiniteNumber(size.Y)
-        or size.Y <= 0 then
-
-        return nil
-
-    end
-
-
-    if not isValidPosition(
-        cf.Position
-    ) then
-
-        return nil
-
-    end
-
-
-    local verticalOffset =
-        (size.Y * 0.5)
-        + HEIGHT_OFFSET
-
-
-    local target =
-        cf * CFrame.new(
-            0,
-            verticalOffset,
-            0
-        )
-
-
-    if not isValidPosition(
-        target.Position
-    ) then
-
-        return nil
-
-    end
-
-
-    return target
-
-end
-
-
---==============================================================
--- TOP SURFACE OF EGG
+-- EGG TOP CFRAME
 --==============================================================
 
 function getEggTopCFrame(egg)
@@ -1871,28 +2236,19 @@ function safeTeleport(
     end
 
 
-    local distance =
-        (root.Position
-            - targetPosition).Magnitude
+    -- Không còn kiểm tra khoảng cách.
+    -- TP trực tiếp tới vị trí đích.
+
+    root.AssemblyLinearVelocity =
+        Vector3.zero
+
+    root.AssemblyAngularVelocity =
+        Vector3.zero
 
 
-    if not isFiniteNumber(
-        distance
-    ) then
-
-        return false,
-            "Teleport distance is invalid"
-
-    end
-
-
-    if distance >
-        MAX_TELEPORT_DISTANCE then
-
-        return false,
-            "Teleport distance is too far"
-
-    end
+    character:PivotTo(
+        targetCFrame
+    )
 
 
     root.AssemblyLinearVelocity =
@@ -1902,17 +2258,13 @@ function safeTeleport(
         Vector3.zero
 
 
-    root.CFrame =
-        targetCFrame
-
-
     return true
 
 end
 
 
 --==============================================================
--- FIND PLAYER PLOT
+-- FIND MY PLOT
 --==============================================================
 
 local function scanMyPlot()
@@ -1931,7 +2283,6 @@ local function scanMyPlot()
 
 
     PlotScanCount += 1
-
 
     CachedMyPlot = nil
     CachedBaseplate = nil
@@ -2010,13 +2361,14 @@ end
 
 
 --==============================================================
--- VALIDATE CACHED PLOT
+-- GET MY PLOT
 --==============================================================
 
 local function getMyPlot()
 
     if CachedMyPlot
         and CachedMyPlot.Parent then
+
 
         local data =
             CachedMyPlot:FindFirstChild(
@@ -2112,7 +2464,75 @@ end
 
 
 --==============================================================
--- GLOBAL ESP
+-- BASEPLATE TOP
+--==============================================================
+
+local function getBaseplateTopCFrame(
+    baseplate
+)
+
+    if not baseplate
+        or not baseplate:IsA("BasePart")
+        or not baseplate.Parent then
+
+        return nil
+
+    end
+
+
+    local size =
+        baseplate.Size
+
+    local cf =
+        baseplate.CFrame
+
+
+    if not isFiniteNumber(size.Y)
+        or size.Y <= 0 then
+
+        return nil
+
+    end
+
+
+    if not isValidPosition(
+        cf.Position
+    ) then
+
+        return nil
+
+    end
+
+
+    local verticalOffset =
+        (size.Y * 0.5)
+        + HEIGHT_OFFSET
+
+
+    local target =
+        cf * CFrame.new(
+            0,
+            verticalOffset,
+            0
+        )
+
+
+    if not isValidPosition(
+        target.Position
+    ) then
+
+        return nil
+
+    end
+
+
+    return target
+
+end
+
+
+--==============================================================
+-- GLOBAL ESP BUTTON
 --==============================================================
 
 GlobalToggle.MouseButton1Click:Connect(
@@ -2125,25 +2545,25 @@ GlobalToggle.MouseButton1Click:Connect(
         if GlobalESPEnabled then
 
             GlobalToggle.Text =
-                "ESP: ON"
+                "ESP  •  ON"
 
             GlobalToggle.BackgroundColor3 =
                 Color3.fromRGB(
-                    50,
-                    120,
-                    70
+                    60,
+                    155,
+                    95
                 )
 
         else
 
             GlobalToggle.Text =
-                "ESP: OFF"
+                "ESP  •  OFF"
 
             GlobalToggle.BackgroundColor3 =
                 Color3.fromRGB(
-                    120,
-                    55,
-                    55
+                    145,
+                    65,
+                    75
                 )
 
         end
@@ -2189,7 +2609,7 @@ GlobalToggle.MouseButton1Click:Connect(
 
 
 --==============================================================
--- TP TO MY PLOT
+-- TP MY PLOT
 --==============================================================
 
 PlotTP.MouseButton1Click:Connect(
@@ -2221,7 +2641,7 @@ PlotTP.MouseButton1Click:Connect(
         if not baseplate then
 
             Status.Text =
-                "Không tìm thấy Baseplate plot của bạn"
+                "Không tìm thấy Plot của bạn"
 
             return
 
@@ -2255,7 +2675,7 @@ PlotTP.MouseButton1Click:Connect(
         if success then
 
             Status.Text =
-                "Đã TP tới Baseplate plot"
+                "Đã teleport tới My Plot"
 
         else
 
@@ -2315,7 +2735,7 @@ TeleportEgg.MouseButton1Click:Connect(
         if not target then
 
             Status.Text =
-                "Egg chưa sẵn sàng để TP"
+                "Egg chưa sẵn sàng"
 
             return
 
@@ -2333,7 +2753,7 @@ TeleportEgg.MouseButton1Click:Connect(
         if success then
 
             Status.Text =
-                "Đã TP tới "
+                "Đã teleport tới "
                 .. SelectedEgg.Name
 
         else
@@ -2349,6 +2769,65 @@ TeleportEgg.MouseButton1Click:Connect(
 
 
 --==============================================================
+-- SEARCH
+--==============================================================
+
+local function updateSearch()
+
+    local query =
+        string.lower(
+            Search.Text or ""
+        )
+
+
+    for _, entry in pairs(
+        EggEntries
+    ) do
+
+        if entry
+            and entry.Model
+            and entry.Frame then
+
+
+            if not entry.Model.Parent then
+
+                entry.Frame.Visible =
+                    false
+
+            else
+
+                local name =
+                    string.lower(
+                        entry.Model.Name
+                    )
+
+
+                entry.Frame.Visible =
+                    query == ""
+                    or string.find(
+                        name,
+                        query,
+                        1,
+                        true
+                    ) ~= nil
+
+            end
+
+        end
+
+    end
+
+end
+
+
+Search:GetPropertyChangedSignal(
+    "Text"
+):Connect(
+    updateSearch
+)
+
+
+--==============================================================
 -- UPDATE LOOP
 --==============================================================
 
@@ -2359,13 +2838,17 @@ task.spawn(function()
         getCharacter()
 
 
-        local characterRoot =
+        local root =
             RootPart
+
+
+        local totalEggs = 0
 
 
         for model, esp in pairs(
             ESPs
         ) do
+
 
             if not model
                 or not model.Parent
@@ -2393,21 +2876,42 @@ task.spawn(function()
                 end
 
 
+                local group =
+                    EggGroups[
+                        model.Name
+                    ]
+
+
+                if group then
+                    group.Eggs[model] =
+                        nil
+                end
+
+
             else
 
-                local root =
+                totalEggs += 1
+
+
+                local eggRoot =
                     getRootPart(model)
 
 
-                if root
-                    and characterRoot then
+                if eggRoot then
 
 
-                    local distance =
-                        (
-                            characterRoot.Position
-                            - root.Position
-                        ).Magnitude
+                    local distance = 0
+
+
+                    if root then
+
+                        distance =
+                            (
+                                root.Position
+                                - eggRoot.Position
+                            ).Magnitude
+
+                    end
 
 
                     local group =
@@ -2424,8 +2928,16 @@ task.spawn(function()
                     local enabled =
                         GlobalESPEnabled
                         and groupEnabled
-                        and distance <=
-                            MAX_DISTANCE
+
+
+                    if root then
+
+                        enabled =
+                            enabled
+                            and distance <=
+                                MAX_DISTANCE
+
+                    end
 
 
                     esp.Billboard.Enabled =
@@ -2440,29 +2952,47 @@ task.spawn(function()
                     end
 
 
-                    esp.Label.Text =
-                        model.Name
-                        .. "\n["
-                        .. math.floor(
-                            distance
-                        )
-                        .. " studs]"
+                    if root then
+
+                        esp.Label.Text =
+                            model.Name
+                            .. "\n["
+                            .. math.floor(
+                                distance
+                            )
+                            .. " studs]"
+
+
+                    else
+
+                        esp.Label.Text =
+                            model.Name
+
+                    end
 
 
                     local entry =
                         EggEntries[model]
 
 
-                    if entry
-                        and entry.Frame then
+                    if entry then
 
-                        entry.Select.Text =
-                            model.Name
-                            .. " ["
-                            .. math.floor(
-                                distance
-                            )
-                            .. " studs]"
+                        if root then
+
+                            entry.Select.Text =
+                                model.Name
+                                .. "  ["
+                                .. math.floor(
+                                    distance
+                                )
+                                .. " studs]"
+
+                        else
+
+                            entry.Select.Text =
+                                model.Name
+
+                        end
 
 
                         local query =
@@ -2495,18 +3025,13 @@ task.spawn(function()
         end
 
 
-        local eggCount = 0
-
-
-        for _ in pairs(ESPs) do
-            eggCount += 1
-        end
+        CountLabel.Text =
+            "Egg: "
+            .. totalEggs
 
 
         Status.Text =
-            "Egg: "
-            .. eggCount
-            .. " | Plot scans: "
+            "Online  •  Plot scan "
             .. PlotScanCount
             .. "/"
             .. MAX_PLOT_SCANS
@@ -2522,7 +3047,7 @@ end)
 
 
 --==============================================================
--- CLOSE / SHUTDOWN
+-- SHUTDOWN
 --==============================================================
 
 local function shutdown()
@@ -2572,12 +3097,12 @@ Close.MouseButton1Click:Connect(
 
 
 --==============================================================
--- DONE
+-- START
 --==============================================================
 
 Status.Text =
-    "ESP đã sẵn sàng | Đang theo dõi Egg mới..."
+    "Online  •  Đang theo dõi Egg mới"
 
 print(
-    "[Egg ESP] Loaded successfully."
+    "[Rendered Eggs] ESP + Teleport loaded"
 )
