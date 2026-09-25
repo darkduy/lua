@@ -434,9 +434,10 @@ Subtitle.TextXAlignment =
     Enum.TextXAlignment.Left
 
 Subtitle.Text =
-    "ESP • Search • Teleport"
+    ""
 
 Subtitle.Parent = TopBar
+Subtitle.Visible = false
 
 
 local Close =
@@ -865,7 +866,7 @@ SelectedLabel.TextXAlignment =
     Enum.TextXAlignment.Left
 
 SelectedLabel.Text =
-    "Selected: None"
+    ""
 
 SelectedLabel.Parent = SelectedBox
 
@@ -911,7 +912,7 @@ ListTitle.TextXAlignment =
     Enum.TextXAlignment.Left
 
 ListTitle.Text =
-    "EGG TYPES"
+    "EGGS"
 
 ListTitle.Parent = Main
 
@@ -1061,9 +1062,10 @@ Status.TextXAlignment =
     Enum.TextXAlignment.Left
 
 Status.Text =
-    "Initializing..."
+    ""
 
 Status.Parent = Main
+Status.Visible = false
 
 
 --==============================================================
