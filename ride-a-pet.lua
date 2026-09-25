@@ -1,21 +1,21 @@
 --[[
 ╔══════════════════════════════════════════════════════════════════╗
-║                 RENDERED EGGS ESP + TELEPORT                  ║
+║                 RENDERED EGGS ESP + TELEPORT                     ║
 ║                                                                  ║
-║ • ESP all Models inside workspace.RenderedEggs                 ║
-║ • Show name + distance                                        ║
-║ • Group Eggs by name                                         ║
-║ • Collapse / expand groups                                        ║
-║ • Global ESP ON/OFF                                                ║
-║ • Per-Egg-type ESP ON/OFF                                      ║
-║ • Search Eggs                                                   ║
-║ • Select Egg + Teleport                                            ║
-║ • Direct TP button for each Egg                                     ║
-║ • Newly spawned Eggs are detected automatically                           ║
-║ • Automatically find the LocalPlayer plot using Data.Owner                    ║
+║ • ESP all Models inside workspace.RenderedEggs                   ║
+║ • Show name + distance                                           ║
+║ • Group Eggs by name                                             ║
+║ • Collapse / expand groups                                       ║
+║ • Global ESP ON/OFF                                              ║
+║ • Per-Egg-type ESP ON/OFF                                        ║
+║ • Search Eggs                                                    ║
+║ • Select Egg + Teleport                                          ║
+║ • Direct TP button for each Egg                                  ║
+║ • Newly spawned Eggs are detected automatically                  ║
+║ • Automatically find the LocalPlayer plot using Data.Owner       ║
 ║ • workspace.Plots is scanned at most 2 times                     ║
-║ • TP 5 studs above the Egg / Baseplate                            ║
-║ • No script-side teleport distance limit                    ║
+║ • TP 5 studs above the Egg / Baseplate                           ║
+║ • No script-side teleport distance limit                         ║
 ╚══════════════════════════════════════════════════════════════════╝
 ]]
 
@@ -232,9 +232,9 @@ Main.Size =
 Main.Position =
     UDim2.new(
         0.5,
-        -215,
+        -172,
         0.5,
-        -280
+        -224
     )
 
 Main.BackgroundColor3 =
@@ -247,6 +247,11 @@ Main.BackgroundColor3 =
 Main.BorderSizePixel = 0
 
 Main.Parent = ScreenGui
+
+-- UI SCALE
+local MainScale = Instance.new("UIScale")
+MainScale.Scale = 0.8
+MainScale.Parent = Main
 
 
 local MainCorner =
