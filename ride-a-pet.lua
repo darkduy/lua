@@ -2,20 +2,20 @@
 ╔══════════════════════════════════════════════════════════════════╗
 ║                 RENDERED EGGS ESP + TELEPORT                  ║
 ║                                                                  ║
-║ • ESP tất cả Model trong workspace.RenderedEggs                 ║
-║ • Hiện tên + khoảng cách                                        ║
-║ • Nhóm các Egg cùng tên                                         ║
-║ • Thu gọn / mở rộng nhóm                                        ║
-║ • ESP tổng ON/OFF                                                ║
-║ • ESP từng loại Egg ON/OFF                                      ║
-║ • Tìm kiếm Egg                                                   ║
-║ • Chọn Egg + Teleport                                            ║
-║ • Nút TP trực tiếp từng Egg                                     ║
-║ • Egg mới spawn tự động được phát hiện                           ║
-║ • Tự tìm Plot của LocalPlayer bằng Data.Owner                    ║
-║ • workspace.Plots chỉ được quét tối đa 2 lần                     ║
-║ • TP trên mặt Egg / Baseplate 5 studs                            ║
-║ • Không giới hạn khoảng cách TP ở phía script                    ║
+║ • ESP all Models inside workspace.RenderedEggs                 ║
+║ • Show name + distance                                        ║
+║ • Group Eggs by name                                         ║
+║ • Collapse / expand groups                                        ║
+║ • Global ESP ON/OFF                                                ║
+║ • Per-Egg-type ESP ON/OFF                                      ║
+║ • Search Eggs                                                   ║
+║ • Select Egg + Teleport                                            ║
+║ • Direct TP button for each Egg                                     ║
+║ • Newly spawned Eggs are detected automatically                           ║
+║ • Automatically find the LocalPlayer plot using Data.Owner                    ║
+║ • workspace.Plots is scanned at most 2 times                     ║
+║ • TP 5 studs above the Egg / Baseplate                            ║
+║ • No script-side teleport distance limit                    ║
 ╚══════════════════════════════════════════════════════════════════╝
 ]]
 
@@ -29,12 +29,12 @@ local RenderedEggs = workspace:FindFirstChild("RenderedEggs")
 local Plots = workspace:FindFirstChild("Plots")
 
 if not RenderedEggs then
-    warn("[Egg ESP] Không tìm thấy workspace.RenderedEggs")
+    warn("[Egg ESP] workspace.RenderedEggs was not found")
     return
 end
 
 if not Plots then
-    warn("[Egg ESP] Không tìm thấy workspace.Plots")
+    warn("[Egg ESP] workspace.Plots was not found")
 end
 
 
@@ -45,13 +45,13 @@ end
 local UPDATE_RATE = 0.20
 local MAX_DISTANCE = 1000
 
--- Khoảng cách thực tế phía trên vật thể
+-- Actual height above the object
 local HEIGHT_OFFSET = 5
 
 local DEFAULT_ESP = true
 local SHOW_HIGHLIGHT = true
 
--- Không còn MAX_TELEPORT_DISTANCE
+-- MAX_TELEPORT_DISTANCE is no longer used
 
 
 --==============================================================
@@ -1056,7 +1056,7 @@ Status.TextXAlignment =
     Enum.TextXAlignment.Left
 
 Status.Text =
-    "Đang khởi tạo..."
+    "Initializing..."
 
 Status.Parent = Main
 
@@ -1386,6 +1386,7 @@ local function createEggGroup(groupName)
 
         TypeESPEnabled = true,
 
+        GroupFrame = nil,
         Header = nil,
 
         Container = nil,
@@ -1397,11 +1398,45 @@ local function createEggGroup(groupName)
     }
 
 
+    -- Each Egg group gets one wrapper so the header and its contents
+    -- stay together when UIListLayout sorts the scrolling list.
+    local GroupFrame =
+        Instance.new("Frame")
+
+    GroupFrame.Name =
+        "Group_" .. groupName
+
+    GroupFrame.Size =
+        UDim2.new(
+            1,
+            -2,
+            0,
+            34
+        )
+
+    GroupFrame.BackgroundTransparency = 1
+
+    GroupFrame.AutomaticSize =
+        Enum.AutomaticSize.Y
+
+    GroupFrame.Parent = List
+
+    local GroupLayout =
+        Instance.new("UIListLayout")
+
+    GroupLayout.Padding =
+        UDim.new(0, 2)
+
+    GroupLayout.SortOrder =
+        Enum.SortOrder.LayoutOrder
+
+    GroupLayout.Parent = GroupFrame
+
     local Header =
         Instance.new("Frame")
 
     Header.Name =
-        "Group_" .. groupName
+        "Header"
 
     Header.Size =
         UDim2.new(
@@ -1420,7 +1455,8 @@ local function createEggGroup(groupName)
 
     Header.BorderSizePixel = 0
 
-    Header.Parent = List
+    Header.LayoutOrder = 1
+    Header.Parent = GroupFrame
 
 
     local HeaderCorner =
@@ -1544,8 +1580,9 @@ local function createEggGroup(groupName)
 
     Container.Visible = true
 
+    Container.LayoutOrder = 2
     Container.Parent =
-        List
+        GroupFrame
 
 
     local ContainerLayout =
@@ -1557,6 +1594,9 @@ local function createEggGroup(groupName)
     ContainerLayout.Parent =
         Container
 
+
+    group.GroupFrame =
+        GroupFrame
 
     group.Header =
         Header
@@ -1584,6 +1624,8 @@ local function createEggGroup(groupName)
             Container.Visible =
                 group.Expanded
 
+            GroupFrame.AutomaticSize =
+                Enum.AutomaticSize.Y
 
             if group.Expanded then
 
@@ -1890,7 +1932,7 @@ local function createEggEntry(model)
                 or not model.Parent then
 
                 Status.Text =
-                    "Egg không còn tồn tại"
+                    "Egg no longer exists"
 
                 return
 
@@ -1904,7 +1946,7 @@ local function createEggEntry(model)
                 or not RootPart then
 
                 Status.Text =
-                    "Không tìm thấy nhân vật"
+                    "Character not found"
 
                 return
 
@@ -1920,7 +1962,7 @@ local function createEggEntry(model)
             if not target then
 
                 Status.Text =
-                    "Egg chưa sẵn sàng"
+                    "Egg is not ready"
 
                 return
 
@@ -1945,13 +1987,13 @@ local function createEggEntry(model)
                     .. model.Name
 
                 Status.Text =
-                    "Đã teleport tới "
+                    "Teleported to "
                     .. model.Name
 
             else
 
                 Status.Text =
-                    "TP thất bại: "
+                    "Teleport failed: "
                     .. tostring(reason)
 
             end
@@ -2236,8 +2278,8 @@ function safeTeleport(
     end
 
 
-    -- Không còn kiểm tra khoảng cách.
-    -- TP trực tiếp tới vị trí đích.
+    -- No distance check is performed.
+    -- Teleport directly to the target position.
 
     root.AssemblyLinearVelocity =
         Vector3.zero
@@ -2627,7 +2669,7 @@ PlotTP.MouseButton1Click:Connect(
             or not RootPart then
 
             Status.Text =
-                "Không tìm thấy nhân vật"
+                "Character not found"
 
             return
 
@@ -2641,7 +2683,7 @@ PlotTP.MouseButton1Click:Connect(
         if not baseplate then
 
             Status.Text =
-                "Không tìm thấy Plot của bạn"
+                "Your Plot was not found"
 
             return
 
@@ -2657,7 +2699,7 @@ PlotTP.MouseButton1Click:Connect(
         if not target then
 
             Status.Text =
-                "Baseplate không hợp lệ"
+                "Invalid Baseplate"
 
             return
 
@@ -2675,12 +2717,12 @@ PlotTP.MouseButton1Click:Connect(
         if success then
 
             Status.Text =
-                "Đã teleport tới My Plot"
+                "Teleported to My Plot"
 
         else
 
             Status.Text =
-                "TP thất bại: "
+                "Teleport failed: "
                 .. tostring(reason)
 
         end
@@ -2705,7 +2747,7 @@ TeleportEgg.MouseButton1Click:Connect(
             or not SelectedEgg.Parent then
 
             Status.Text =
-                "Chưa chọn Egg"
+                "No Egg selected"
 
             return
 
@@ -2719,7 +2761,7 @@ TeleportEgg.MouseButton1Click:Connect(
             or not RootPart then
 
             Status.Text =
-                "Không tìm thấy nhân vật"
+                "Character not found"
 
             return
 
@@ -2735,7 +2777,7 @@ TeleportEgg.MouseButton1Click:Connect(
         if not target then
 
             Status.Text =
-                "Egg chưa sẵn sàng"
+                "Egg is not ready"
 
             return
 
@@ -2753,13 +2795,13 @@ TeleportEgg.MouseButton1Click:Connect(
         if success then
 
             Status.Text =
-                "Đã teleport tới "
+                "Teleported to "
                 .. SelectedEgg.Name
 
         else
 
             Status.Text =
-                "TP thất bại: "
+                "Teleport failed: "
                 .. tostring(reason)
 
         end
@@ -2779,6 +2821,44 @@ local function updateSearch()
             Search.Text or ""
         )
 
+    local groupHasMatch = {}
+
+    for model, entry in pairs(EggEntries) do
+        if entry and entry.Model and entry.Frame and entry.Model.Parent then
+            local name =
+                string.lower(
+                    entry.Model.Name
+                )
+
+            local matches =
+                query == ""
+                or string.find(
+                    name,
+                    query,
+                    1,
+                    true
+                ) ~= nil
+
+            entry.Frame.Visible = matches
+
+            local group =
+                EggGroups[entry.Model.Name]
+
+            if group and matches then
+                groupHasMatch[group] = true
+            end
+        elseif entry and entry.Frame then
+            entry.Frame.Visible = false
+        end
+    end
+
+    for _, group in pairs(EggGroups) do
+        if query == "" then
+            group.GroupFrame.Visible = true
+        else
+            group.GroupFrame.Visible = groupHasMatch[group] == true
+        end
+    end
 
     for _, entry in pairs(
         EggEntries
@@ -2802,14 +2882,10 @@ local function updateSearch()
                     )
 
 
+                -- Visibility is updated in the group-aware pass above.
+                -- Keep this branch intentionally lightweight.
                 entry.Frame.Visible =
-                    query == ""
-                    or string.find(
-                        name,
-                        query,
-                        1,
-                        true
-                    ) ~= nil
+                    entry.Frame.Visible
 
             end
 
@@ -3101,7 +3177,7 @@ Close.MouseButton1Click:Connect(
 --==============================================================
 
 Status.Text =
-    "Online  •  Đang theo dõi Egg mới"
+    "Online  •  Watching for new Eggs"
 
 print(
     "[Rendered Eggs] ESP + Teleport loaded"
