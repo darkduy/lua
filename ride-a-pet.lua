@@ -3,7 +3,7 @@
 ║                 RENDERED EGGS ESP + TELEPORT                     ║
 ║                                                                  ║
 ║ • ESP all Models inside workspace.RenderedEggs                   ║
-║ • Show name + distance                                           ║
+║ • Show name + distance at any range                              ║
 ║ • Group Eggs by name                                             ║
 ║ • Collapse / expand groups                                       ║
 ║ • Global ESP ON/OFF                                              ║
@@ -43,7 +43,6 @@ end
 --==============================================================
 
 local UPDATE_RATE = 0.20
-local MAX_DISTANCE = 1000
 
 -- Actual height above the object
 local HEIGHT_OFFSET = 10
@@ -78,6 +77,8 @@ local CachedBaseplate = nil
 local MAX_PLOT_SCANS = 2
 
 local updateSearch = nil
+local getEggTopCFrame = nil
+local safeTeleport = nil
 
 
 --==============================================================
@@ -2189,7 +2190,7 @@ Connections.DescendantAdded =
 -- EGG TOP CFRAME
 --==============================================================
 
-local function getEggTopCFrame(egg)
+getEggTopCFrame = function(egg)
 
     if not egg
         or not egg:IsA("Model")
@@ -2251,7 +2252,7 @@ end
 -- SAFE TELEPORT
 --==============================================================
 
-local function safeTeleport(
+safeTeleport = function(
     character,
     root,
     targetCFrame
@@ -2918,15 +2919,6 @@ task.spawn(function()
                         GlobalESPEnabled
                         and groupEnabled
 
-
-                    if root then
-
-                        enabled =
-                            enabled
-                            and distance <=
-                                MAX_DISTANCE
-
-                    end
 
 
                     esp.Billboard.Enabled =
