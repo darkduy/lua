@@ -612,7 +612,7 @@ PlotTP.BackgroundColor3 =
     )
 
 PlotTP.Text =
-    "TP My Plot +5"
+    "TP My Plot"
 
 PlotTP.Parent = Main
 
@@ -856,7 +856,7 @@ TeleportEgg.Font =
 TeleportEgg.TextSize = 13
 
 TeleportEgg.Text =
-    "TP Above Egg +5"
+    "TP Above Egg"
 
 TeleportEgg.Parent = Main
 
@@ -1412,7 +1412,7 @@ local function createEggEntry(model)
         )
 
     TP.Text =
-        "TP +5"
+        "TP"
 
     TP.TextColor3 =
         Color3.fromRGB(
@@ -1527,7 +1527,6 @@ local function createEggEntry(model)
                 Status.Text =
                     "Đã TP tới "
                     .. model.Name
-                    .. " +5"
 
             else
 
@@ -2256,7 +2255,7 @@ PlotTP.MouseButton1Click:Connect(
         if success then
 
             Status.Text =
-                "Đã TP tới Baseplate plot +5"
+                "Đã TP tới Baseplate plot"
 
         else
 
@@ -2336,7 +2335,6 @@ TeleportEgg.MouseButton1Click:Connect(
             Status.Text =
                 "Đã TP tới "
                 .. SelectedEgg.Name
-                .. " +5"
 
         else
 
