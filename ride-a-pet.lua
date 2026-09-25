@@ -9,12 +9,12 @@
 ║ • Global ESP ON/OFF                                              ║
 ║ • Per-Egg-type ESP ON/OFF                                        ║
 ║ • Search Eggs                                                    ║
-║ • Select Egg + Teleport                                          ║
+║ • Select Egg                                                     ║
 ║ • Direct TP button for each Egg                                  ║
 ║ • Newly spawned Eggs are detected automatically                  ║
 ║ • Automatically find the LocalPlayer plot using Data.Owner       ║
 ║ • workspace.Plots is scanned at most 2 times                     ║
-║ • TP 5 studs above the Egg / Baseplate                           ║
+║ • TP 10 studs above the Egg / Baseplate                          ║
 ║ • No script-side teleport distance limit                         ║
 ╚══════════════════════════════════════════════════════════════════╝
 ]]
@@ -46,7 +46,7 @@ local UPDATE_RATE = 0.20
 local MAX_DISTANCE = 1000
 
 -- Actual height above the object
-local HEIGHT_OFFSET = 5
+local HEIGHT_OFFSET = 10
 
 local DEFAULT_ESP = true
 local SHOW_HIGHLIGHT = true
@@ -1066,63 +1066,6 @@ Status.Text =
 
 Status.Parent = Main
 Status.Visible = false
-
-
---==============================================================
--- TELEPORT BUTTON
---==============================================================
-
-local TeleportEgg =
-    Instance.new("TextButton")
-
-TeleportEgg.Size =
-    UDim2.new(
-        0,
-        145,
-        0,
-        38
-    )
-
-TeleportEgg.Position =
-    UDim2.new(
-        1,
-        -157,
-        0,
-        495
-    )
-
-TeleportEgg.BackgroundColor3 =
-    Color3.fromRGB(
-        95,
-        115,
-        210
-    )
-
-TeleportEgg.Text =
-    "Teleport"
-
-TeleportEgg.TextColor3 =
-    Color3.fromRGB(
-        255,
-        255,
-        255
-    )
-
-TeleportEgg.Font =
-    Enum.Font.GothamBold
-
-TeleportEgg.TextSize = 12
-
-TeleportEgg.Parent = Main
-
-
-local TeleportCorner =
-    Instance.new("UICorner")
-
-TeleportCorner.CornerRadius =
-    UDim.new(0, 9)
-
-TeleportCorner.Parent = TeleportEgg
 
 
 --==============================================================
@@ -2725,85 +2668,6 @@ PlotTP.MouseButton1Click:Connect(
 
             Status.Text =
                 "Teleported to My Plot"
-
-        else
-
-            Status.Text =
-                "Teleport failed: "
-                .. tostring(reason)
-
-        end
-
-    end
-)
-
-
---==============================================================
--- TP SELECTED EGG
---==============================================================
-
-TeleportEgg.MouseButton1Click:Connect(
-    function()
-
-        if not Running then
-            return
-        end
-
-
-        if not SelectedEgg
-            or not SelectedEgg.Parent then
-
-            Status.Text =
-                "No Egg selected"
-
-            return
-
-        end
-
-
-        getCharacter()
-
-
-        if not Character
-            or not RootPart then
-
-            Status.Text =
-                "Character not found"
-
-            return
-
-        end
-
-
-        local target =
-            getEggTopCFrame(
-                SelectedEgg
-            )
-
-
-        if not target then
-
-            Status.Text =
-                "Egg is not ready"
-
-            return
-
-        end
-
-
-        local success, reason =
-            safeTeleport(
-                Character,
-                RootPart,
-                target
-            )
-
-
-        if success then
-
-            Status.Text =
-                "Teleported to "
-                .. SelectedEgg.Name
 
         else
 
