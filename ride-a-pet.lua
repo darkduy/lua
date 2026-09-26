@@ -65,8 +65,6 @@ local EggEntries = {}
 local EggGroups = {}
 local Connections = {}
 
-local SelectedEgg = nil
-
 local Character = nil
 local RootPart = nil
 
@@ -798,141 +796,6 @@ Search.Parent = SearchBox
 
 
 --==============================================================
--- SELECTED
---==============================================================
-
-local SelectedBox =
-    Instance.new("Frame")
-
-SelectedBox.Size =
-    UDim2.new(
-        1,
-        -24,
-        0,
-        36
-    )
-
-SelectedBox.Position =
-    UDim2.new(
-        0,
-        12,
-        0,
-        165
-    )
-
-SelectedBox.BackgroundColor3 =
-    Color3.fromRGB(
-        29,
-        30,
-        39
-    )
-
-SelectedBox.BorderSizePixel = 0
-
-SelectedBox.Parent = Main
-
-
-local SelectedCorner =
-    Instance.new("UICorner")
-
-SelectedCorner.CornerRadius =
-    UDim.new(0, 8)
-
-SelectedCorner.Parent = SelectedBox
-
-
-local SelectedLabel =
-    Instance.new("TextLabel")
-
-SelectedLabel.Size =
-    UDim2.new(
-        1,
-        -18,
-        1,
-        0
-    )
-
-SelectedLabel.Position =
-    UDim2.new(
-        0,
-        9,
-        0,
-        0
-    )
-
-SelectedLabel.BackgroundTransparency = 1
-
-SelectedLabel.Font =
-    Enum.Font.Gotham
-
-SelectedLabel.TextSize = 12
-
-SelectedLabel.TextTruncate =
-    Enum.TextTruncate.AtEnd
-
-SelectedLabel.TextColor3 =
-    Color3.fromRGB(
-        170,
-        174,
-        190
-    )
-
-SelectedLabel.TextXAlignment =
-    Enum.TextXAlignment.Left
-
-SelectedLabel.Text =
-    "No egg selected"
-
-SelectedLabel.Parent = SelectedBox
-
-
---==============================================================
--- LIST TITLE
---==============================================================
-
-local ListTitle =
-    Instance.new("TextLabel")
-
-ListTitle.Size =
-    UDim2.new(
-        1,
-        -24,
-        0,
-        24
-    )
-
-ListTitle.Position =
-    UDim2.new(
-        0,
-        12,
-        0,
-        208
-    )
-
-ListTitle.BackgroundTransparency = 1
-
-ListTitle.Font =
-    Enum.Font.GothamBold
-
-ListTitle.TextSize = 12
-
-ListTitle.TextColor3 =
-    Color3.fromRGB(
-        220,
-        223,
-        238
-    )
-
-ListTitle.TextXAlignment =
-    Enum.TextXAlignment.Left
-
-ListTitle.Text =
-    "EGGS"
-
-ListTitle.Parent = Main
-
-
---==============================================================
 -- SCROLL LIST
 --==============================================================
 
@@ -944,7 +807,7 @@ List.Size =
         1,
         -24,
         0,
-        260
+        328
     )
 
 List.Position =
@@ -952,7 +815,7 @@ List.Position =
         0,
         12,
         0,
-        233
+        165
     )
 
 List.BackgroundColor3 =
@@ -963,6 +826,9 @@ List.BackgroundColor3 =
     )
 
 List.BorderSizePixel = 0
+List.ClipsDescendants = true
+List.ScrollingDirection =
+    Enum.ScrollingDirection.Y
 
 List.ScrollBarThickness = 4
 
@@ -1016,7 +882,7 @@ ListLayout.Padding =
     UDim.new(0, 4)
 
 ListLayout.SortOrder =
-    Enum.SortOrder.Name
+    Enum.SortOrder.LayoutOrder
 
 ListLayout.Parent = List
 
@@ -1724,6 +1590,21 @@ end
 
 
 --==============================================================
+-- GROUP ORDER
+--==============================================================
+
+local function updateGroupLayoutOrder(group)
+    local eggCount = 0
+
+    for _ in pairs(group.Eggs) do
+        eggCount += 1
+    end
+
+    group.GroupFrame.LayoutOrder = eggCount
+end
+
+
+--==============================================================
 -- CREATE EGG ENTRY
 --==============================================================
 
@@ -1750,6 +1631,7 @@ local function createEggEntry(model)
 
 
     group.Eggs[model] = true
+    updateGroupLayoutOrder(group)
 
 
     local Row =
@@ -1789,10 +1671,10 @@ local function createEggEntry(model)
         Row
 
 
-    local Select =
-        Instance.new("TextButton")
+    local NameLabel =
+        Instance.new("TextLabel")
 
-    Select.Size =
+    NameLabel.Size =
         UDim2.new(
             1,
             -72,
@@ -1800,7 +1682,7 @@ local function createEggEntry(model)
             0
         )
 
-    Select.Position =
+    NameLabel.Position =
         UDim2.new(
             0,
             8,
@@ -1808,30 +1690,30 @@ local function createEggEntry(model)
             0
         )
 
-    Select.BackgroundTransparency = 1
+    NameLabel.BackgroundTransparency = 1
 
-    Select.Text =
+    NameLabel.Text =
         model.Name
 
-    Select.TextColor3 =
+    NameLabel.TextColor3 =
         Color3.fromRGB(
             220,
             222,
             235
         )
 
-    Select.TextXAlignment =
+    NameLabel.TextXAlignment =
         Enum.TextXAlignment.Left
 
-    Select.Font =
+    NameLabel.Font =
         Enum.Font.Gotham
 
-    Select.TextSize = 12
+    NameLabel.TextSize = 12
 
-    Select.TextTruncate =
+    NameLabel.TextTruncate =
         Enum.TextTruncate.AtEnd
 
-    Select.Parent =
+    NameLabel.Parent =
         Row
 
 
@@ -1896,7 +1778,7 @@ local function createEggEntry(model)
 
         Frame = Row,
 
-        Select = Select,
+        Label = NameLabel,
 
         TP = TP
 
@@ -1905,29 +1787,6 @@ local function createEggEntry(model)
 
     EggEntries[model] =
         entry
-
-
-    Select.MouseButton1Click:Connect(
-        function()
-
-            if not model
-                or not model.Parent then
-
-                return
-
-            end
-
-
-            SelectedEgg =
-                model
-
-
-            SelectedLabel.Text =
-                "Selected: "
-                .. model.Name
-
-        end
-    )
 
 
     TP.MouseButton1Click:Connect(
@@ -1991,13 +1850,6 @@ local function createEggEntry(model)
 
 
             if success then
-
-                SelectedEgg =
-                    model
-
-                SelectedLabel.Text =
-                    "Selected: "
-                    .. model.Name
 
                 showStatus(
                     "Teleported to "
@@ -2875,6 +2727,13 @@ task.spawn(function()
                 if group then
                     group.Eggs[model] =
                         nil
+
+                    if next(group.Eggs) then
+                        updateGroupLayoutOrder(group)
+                    else
+                        group.GroupFrame:Destroy()
+                        EggGroups[model.Name] = nil
+                    end
                 end
 
 
@@ -2960,7 +2819,7 @@ task.spawn(function()
 
                         if root then
 
-                            entry.Select.Text =
+                            entry.Label.Text =
                                 model.Name
                                 .. "  ["
                                 .. math.floor(
@@ -2970,7 +2829,7 @@ task.spawn(function()
 
                         else
 
-                            entry.Select.Text =
+                            entry.Label.Text =
                                 model.Name
 
                         end
